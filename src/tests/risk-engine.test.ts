@@ -60,4 +60,33 @@ describe('risk engine', () => {
     expect(decision.approved).toBe(false);
     expect(decision.violatedGuards).toContain('kill_switch_enabled');
   });
+
+  it('rejects when signal is below minimum RR', () => {
+    const decision = evaluateRisk({ ...signal, risk_reward: 1.2 }, cfg, {
+      openTrades: 0,
+      dailyRiskUsedPct: 0,
+      consecutiveLosses: 0,
+      duplicateWithinMinutes: false,
+      nowIso: '2026-03-30T10:00:00.000Z',
+    });
+
+    expect(decision.approved).toBe(false);
+    expect(decision.violatedGuards).toContain('min_risk_reward_failed');
+  });
+
+  it('rejects in configured news window', () => {
+    const decision = evaluateRisk(signal, {
+      ...cfg,
+      newsWindowsUtc: [{ start: '10:00', end: '10:30' }],
+    }, {
+      openTrades: 0,
+      dailyRiskUsedPct: 0,
+      consecutiveLosses: 0,
+      duplicateWithinMinutes: false,
+      nowIso: '2026-03-30T10:15:00.000Z',
+    });
+
+    expect(decision.approved).toBe(false);
+    expect(decision.violatedGuards).toContain('news_window_block');
+  });
 });

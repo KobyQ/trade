@@ -34,7 +34,16 @@ export function summarizeOutcomes(outcomes: Array<{ status: OutcomeStatus; rMult
   const winRate = closed.length === 0 ? 0 : wins / closed.length;
   const expectancy = closed.length === 0 ? 0 : closed.reduce((sum, o) => sum + o.rMultiple, 0) / closed.length;
 
-  const bySymbol = Object.groupBy(outcomes, (o) => o.symbol);
+  const bySymbol = outcomes.reduce<Record<string, Array<{ status: OutcomeStatus; rMultiple: number; symbol: string }>>>(
+    (acc, outcome) => {
+      if (!acc[outcome.symbol]) {
+        acc[outcome.symbol] = [];
+      }
+      acc[outcome.symbol].push(outcome);
+      return acc;
+    },
+    {},
+  );
 
   return {
     total: outcomes.length,

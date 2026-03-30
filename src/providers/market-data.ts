@@ -34,7 +34,9 @@ export class MockMarketDataProvider implements MarketDataProvider {
 export class AlphaVantageProvider implements MarketDataProvider {
   constructor(private readonly apiKey: string) {}
 
-  async fetchCandles(_input: { symbol: SymbolCode; timeframe: Timeframe; limit: number }): Promise<Candle[]> {
+  async fetchCandles(input: { symbol: SymbolCode; timeframe: Timeframe; limit: number }): Promise<Candle[]> {
+    void input;
+
     if (!this.apiKey) {
       throw new Error('ALPHA_VANTAGE_API_KEY missing');
     }
