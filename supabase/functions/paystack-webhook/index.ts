@@ -1,0 +1,116 @@
+import { serve } from "https://deno.land/std@0.177.0/http/server.ts";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.4";
+import { hmac } from "https://deno.land/x/crypto@v0.10.1/hmac.ts";
+
+const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
+const supabaseServiceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+const paystackSecretKey = Deno.env.get("PAYSTACK_SECRET_KEY")!;
+
+// Paystack verifies with HMAC SHA512
+async function verifyPaystackSignature(payload: string, signature: string): Promise<boolean> {
+  if (!signature || !paystackSecretKey) return false;
+  
+  // Deno Web Crypto API implementation of HMAC-SHA512
+  const encoder = new TextEncoder();
+  const keyBuf = encoder.encode(paystackSecretKey);
+  
+  const cryptoKey = await crypto.subtle.importKey(
+    "raw",
+    keyBuf,
+    { name: "HMAC", hash: "SHA-512" },
+    false,
+    ["sign"]
+  );
+  
+  const payloadBuf = encoder.encode(payload);
+  const signatureBuf = await crypto.subtle.sign("HMAC", cryptoKey, payloadBuf);
+  
+  // Convert ArrayBuffer to Hex String
+  const hashArray = Array.from(new Uint8Array(signatureBuf));
+  const hashHex = hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+  
+  return hashHex === signature;
+}
+
+serve(async (req) => {
+  if (req.method !== 'POST') {
+    return new Response('Method Not Allowed', { status: 405 });
+  }
+
+  try {
+    const signature = req.headers.get('x-paystack-signature');
+    const rawBody = await req.text();
+    
+    if (!signature) {
+      return new Response('Missing signature', { status: 401 });
+    }
+
+    const isValid = await verifyPaystackSignature(rawBody, signature);
+    
+    if (!isValid) {
+      console.error('Invalid Paystack signature');
+      return new Response('Invalid signature', { status: 401 });
+    }
+
+    const event = JSON.parse(rawBody);
+    console.log(`Received Paystack Event: ${event.event}`);
+
+    // Create Supabase client with admin privileges to bypass RLS
+    const supabase = createClient(supabaseUrl, supabaseServiceRoleKey);
+
+    if (event.event === 'charge.success' || event.event === 'subscription.create') {
+      const email = event.data.customer.email;
+      const customerCode = event.data.customer.customer_code;
+      // In charge.success, subscription code might be null if it's a one-off, 
+      // but for plan subscriptions it usually exists, or use subscription.create
+      const subscriptionCode = event.data.subscription_code || event.data.plan?.subscription_code;
+
+      console.log(`Processing successful payment for: ${email}`);
+
+      // 1. Look up the user by email in auth.users
+      // Note: Admin API is required to search auth.users by email
+      const { data: users, error: userError } = await supabase.auth.admin.listUsers();
+      
+      if (userError || !users.users) {
+        throw new Error(`Failed to list users: ${userError?.message}`);
+      }
+      
+      const user = users.users.find((u: any) => u.email === email);
+
+      if (!user) {
+        console.warn(`User not found for email: ${email}. The webhook was successful but no account is linked.`);
+        return new Response('User not found but webhook processed', { status: 200 });
+      }
+
+      // 2. Update their subscription record
+      const { error: updateError } = await supabase
+        .from('user_subscriptions')
+        .update({
+          plan_tier: 'alpha',
+          paystack_customer_code: customerCode,
+          paystack_subscription_code: subscriptionCode,
+          status: 'active',
+          updated_at: new Date().toISOString()
+        })
+        .eq('user_id', user.id);
+
+      if (updateError) {
+        console.error('Failed to update user_subscriptions', updateError);
+        throw updateError;
+      }
+
+      console.log(`Successfully upgraded user ${user.id} to alpha tier.`);
+    }
+
+    // You can handle other events here (e.g. subscription.disable, invoice.payment_failed)
+
+    return new Response(JSON.stringify({ received: true }), {
+      status: 200,
+      headers: { 'Content-Type': 'application/json' }
+    });
+
+  } catch (err: any) {
+    console.error('Webhook Error:', err.message);
+    return new Response(`Webhook Error: ${err.message}`, { status: 500 });
+  }
+});
