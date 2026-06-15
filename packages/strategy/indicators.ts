@@ -1,4 +1,4 @@
-import { EMA, RSI, ADX } from 'technicalindicators';
+import { EMA, RSI, ADX, ATR } from 'technicalindicators';
 
 export type LogicContext = {
   timestamp: string;
@@ -7,8 +7,11 @@ export type LogicContext = {
   ema_200: number | null;
   rsi_14: number | null;
   adx_14: number | null;
+  atr_14: number | null;
   recent_swing_high: number | null;
   recent_swing_low: number | null;
+  safe_long_stop_loss: number | null;
+  safe_short_stop_loss: number | null;
   trend_alignment: 'BULLISH_TREND' | 'BULLISH_PULLBACK' | 'BEARISH_TREND' | 'BEARISH_PULLBACK' | 'CHOP';
 };
 
@@ -27,8 +30,11 @@ export function getContextSnapshot(
       ema_200: null,
       rsi_14: null,
       adx_14: null,
+      atr_14: null,
       recent_swing_high: null,
       recent_swing_low: null,
+      safe_long_stop_loss: null,
+      safe_short_stop_loss: null,
       trend_alignment: 'CHOP',
     };
   }
@@ -47,6 +53,7 @@ export function getContextSnapshot(
   const ema50 = EMA.calculate({ period: 50, values: close });
   const ema200 = EMA.calculate({ period: 200, values: close });
   const rsi14 = RSI.calculate({ period: 14, values: close });
+  const atr14 = ATR.calculate({ period: 14, high, low, close });
   
   let adx14: number[] = [];
   try {
@@ -61,6 +68,12 @@ export function getContextSnapshot(
   const current_ema_200 = ema200.length > 0 ? ema200[ema200.length - 1] : null;
   const current_rsi_14 = rsi14.length > 0 ? rsi14[rsi14.length - 1] : null;
   const current_adx_14 = adx14.length > 0 ? adx14[adx14.length - 1] : null;
+  const current_atr_14 = atr14.length > 0 ? atr14[atr14.length - 1] : null;
+
+  // Calculate safe structural stop loss boundaries
+  const atrBuffer = current_atr_14 !== null ? current_atr_14 * 1.5 : 0;
+  const safe_long_stop_loss = recent_swing_low !== null ? recent_swing_low - atrBuffer : null;
+  const safe_short_stop_loss = recent_swing_high !== null ? recent_swing_high + atrBuffer : null;
 
   // Determine trend alignment
   let trend_alignment: 'BULLISH_TREND' | 'BULLISH_PULLBACK' | 'BEARISH_TREND' | 'BEARISH_PULLBACK' | 'CHOP' = 'CHOP';
@@ -90,8 +103,11 @@ export function getContextSnapshot(
     ema_200: current_ema_200 ? Number(current_ema_200.toFixed(2)) : null,
     rsi_14: current_rsi_14 ? Number(current_rsi_14.toFixed(2)) : null,
     adx_14: current_adx_14 ? Number(current_adx_14.toFixed(2)) : null,
+    atr_14: current_atr_14 ? Number(current_atr_14.toFixed(2)) : null,
     recent_swing_high,
     recent_swing_low,
+    safe_long_stop_loss: safe_long_stop_loss ? Number(safe_long_stop_loss.toFixed(2)) : null,
+    safe_short_stop_loss: safe_short_stop_loss ? Number(safe_short_stop_loss.toFixed(2)) : null,
     trend_alignment,
   };
 }
