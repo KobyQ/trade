@@ -7,6 +7,8 @@ export type LogicContext = {
   ema_200: number | null;
   rsi_14: number | null;
   adx_14: number | null;
+  recent_swing_high: number | null;
+  recent_swing_low: number | null;
   trend_alignment: 'BULLISH_TREND' | 'BULLISH_PULLBACK' | 'BEARISH_TREND' | 'BEARISH_PULLBACK' | 'CHOP';
 };
 
@@ -25,12 +27,21 @@ export function getContextSnapshot(
       ema_200: null,
       rsi_14: null,
       adx_14: null,
+      recent_swing_high: null,
+      recent_swing_low: null,
       trend_alignment: 'CHOP',
     };
   }
 
   const current_price = close[close.length - 1];
   const timestamp = timestamps[timestamps.length - 1] || new Date().toISOString();
+
+  // Calculate recent structural highs and lows (14 bar lookback)
+  const lookback = Math.min(14, high.length);
+  const recentHighs = high.slice(-lookback);
+  const recentLows = low.slice(-lookback);
+  const recent_swing_high = recentHighs.length > 0 ? Math.max(...recentHighs) : null;
+  const recent_swing_low = recentLows.length > 0 ? Math.min(...recentLows) : null;
 
   // Calculate indicators
   const ema50 = EMA.calculate({ period: 50, values: close });
@@ -79,6 +90,8 @@ export function getContextSnapshot(
     ema_200: current_ema_200 ? Number(current_ema_200.toFixed(2)) : null,
     rsi_14: current_rsi_14 ? Number(current_rsi_14.toFixed(2)) : null,
     adx_14: current_adx_14 ? Number(current_adx_14.toFixed(2)) : null,
+    recent_swing_high,
+    recent_swing_low,
     trend_alignment,
   };
 }

@@ -84,8 +84,10 @@ RULES:
    - For a Breakout LONG, your entry price MUST be ABOVE the current price (Buy Stop).
    - For a Breakout SHORT, your entry price MUST be BELOW the current price (Sell Stop).
 3. Risk/Reward must be at least 1:2.
-4. STOP LOSS LOGIC: For LONG trades, place the Stop Loss just below the recent structural swing low. For SHORT trades, place it just above the recent structural swing high.
-   - CRITICAL: Do NOT place the Stop Loss at or near the current price if you are proposing a Breakout Stop order. The Stop Loss must provide structural breathing room.
+4. STOP LOSS LOGIC: You MUST use the \`recent_swing_low\` and \`recent_swing_high\` provided in the snapshot context.
+   - For LONG trades, place the Stop Loss safely BELOW the \`recent_swing_low\`.
+   - For SHORT trades, place the Stop Loss safely ABOVE the \`recent_swing_high\`.
+   - CRITICAL: Do NOT place the Stop Loss at or near the current price if you are proposing a Breakout Stop order. The Stop Loss must provide structural breathing room outside the recent daily/hourly range.
 
 Current Market Context:
 ${JSON.stringify(snapshot, null, 2)}`;
