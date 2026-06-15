@@ -83,11 +83,10 @@ RULES:
 2. TREND breakouts (BULLISH_TREND or BEARISH_TREND) are accepted only if RSI is not over-extended.
    - For a Breakout LONG, your entry price MUST be ABOVE the current price (Buy Stop).
    - For a Breakout SHORT, your entry price MUST be BELOW the current price (Sell Stop).
-3. Risk/Reward must be at least 1:2.
-4. STOP LOSS LOGIC: You MUST use the \`recent_swing_low\` and \`recent_swing_high\` provided in the snapshot context.
-   - For LONG trades, place the Stop Loss safely BELOW the \`recent_swing_low\`.
-   - For SHORT trades, place the Stop Loss safely ABOVE the \`recent_swing_high\`.
-   - CRITICAL: Do NOT place the Stop Loss at or near the current price if you are proposing a Breakout Stop order. The Stop Loss must provide structural breathing room outside the recent daily/hourly range.
+4. STOP LOSS LOGIC: The absolute safe volatility boundaries have already been mathematically pre-calculated for you in the snapshot. You MUST NOT calculate this yourself.
+   - For LONG trades, your Stop Loss MUST be strictly LESS THAN OR EQUAL TO the \`safe_long_stop_loss\` provided in the snapshot.
+   - For SHORT trades, your Stop Loss MUST be strictly GREATER THAN OR EQUAL TO the \`safe_short_stop_loss\` provided in the snapshot.
+   - CRITICAL: Do not attempt to do float math. Simply select a Stop Loss value that obeys the pre-calculated boundary condition.
 
 Current Market Context:
 ${JSON.stringify(snapshot, null, 2)}`;
@@ -110,11 +109,10 @@ ${JSON.stringify(snapshot, null, 2)}`;
             setup_valid: { type: "boolean" },
             entry_price: { type: "number" },
             stop_loss: { type: "number" },
-            take_profit: { type: "number" },
             confidence_score: { type: "number" },
             institutional_rationale: { type: "string" }
           },
-          required: ["setup_valid", "entry_price", "stop_loss", "take_profit", "confidence_score", "institutional_rationale"],
+          required: ["setup_valid", "entry_price", "stop_loss", "confidence_score", "institutional_rationale"],
           additionalProperties: false
         },
         strict: true
@@ -252,12 +250,17 @@ serve(async (req) => {
       // LAYER C: Risk Manager (The Kill Switch)
       const riskValidation = await validateExposure(supabase, symbol);
 
-      const { entry_price, stop_loss, take_profit, confidence_score, institutional_rationale } = evaluation;
+      const { entry_price, stop_loss, confidence_score, institutional_rationale } = evaluation;
+
+      const dbSide = snapshot.trend_alignment.startsWith('BULLISH') ? 'LONG' : 'SHORT';
+      
+      // LAYER C: Deterministic Risk/Reward Math (Force exactly 1:2 R:R)
+      const risk = Math.abs(entry_price - stop_loss);
+      const take_profit = dbSide === 'LONG' ? entry_price + (risk * 2) : entry_price - (risk * 2);
 
       const qty = 1;
       const commission = 0.01;
       const slippageBps = 5;
-      const dbSide = snapshot.trend_alignment.startsWith('BULLISH') ? 'LONG' : 'SHORT';
       const grossEdge = dbSide === 'LONG' ? take_profit - entry_price : entry_price - take_profit;
       const txCost = transactionCost(qty, commission);
       const slip = slippage(entry_price, qty, slippageBps);
