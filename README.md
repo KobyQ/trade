@@ -1,64 +1,88 @@
-# AI Trading (Daily/Hourly)
+# RaineBank Alpha Engine 🏦
 
-**AI-Driven Algorithmic Trading System** using:
+An institutional-grade, fully autonomous algorithmic trading system and B2B/B2C SaaS platform. 
 
-- **Frontend**: Next.js (App Router) on **Vercel**
-- **Backend**: **Supabase** (Postgres + Auth + RLS + Edge Functions + pg_cron)
-- **AI**: Azure OpenAI (private tenant) for explainability (pros/cons, risk notes)
-- **Scheduling**: pg_cron / Supabase Scheduler (with Vercel Cron as backup)
+The RaineBank Engine is designed to identify structural market setups, mathematically evaluate risk via an AI Risk Officer, autonomously execute trades on live brokerages, and automatically market its performance to scale a retail and institutional subscriber base.
 
-> Scope: Daily/Hourly strategies (no tick/HFT). Research runs T-60 before market open; per-minute monitoring for risk automation.
+## 🏗️ System Architecture
 
-## Structure
+### 1. Frontend (The Vault & Storefront)
+- **Framework:** Next.js (App Router) + React.
+- **Styling:** Inline Vanilla CSS & Tailwind CSS, featuring a heavy dark-mode glassmorphic aesthetic inspired by high-end trading terminals.
+- **Pages:**
+  - **Landing Page:** Bento-box structural layout converting traffic to free-tier accounts.
+  - **The Vault (`/dashboard`):** Real-time ledger tracking signals, win-rates, and active trades.
+  - **Developer Portal (`/docs`):** Swagger-less, custom-styled institutional API integration documentation for B2B prop firms.
 
-```
-/apps/web              # Next.js app (UI + server actions + API routes)
-/packages/core         # shared types, schemas
-/packages/strategy     # indicators, regime detection, signal logic
-/packages/execution    # OMS, broker wrapper, idempotency helpers
-/packages/risk         # risk rules, kill-switch, sizing helpers
-/supabase/migrations   # SQL schema
-/supabase/functions    # Edge Functions: research-run, monitor-open-trades
-/.github/workflows     # CI templates
-```
+### 2. Backend (Supabase Core)
+- **Database:** PostgreSQL (Supabase) with Row Level Security (RLS) ensuring strict data isolation.
+- **Trigger Framework:** Heavy reliance on the `pg_net` extension. Database events (`AFTER INSERT`) trigger zero-latency asynchronous HTTP requests to Deno Edge Functions, bypassing the need for polling loops.
+- **Cron Scheduler:** `supabase/config.toml` manages asynchronous heartbeats (via `pg_cron` equivalent features).
 
-## Quick Start
+### 3. Execution Layer (Live Capital)
+- **The Bridge:** **MetaApi.cloud** serves as the REST/WebSocket middleware bridging the Supabase Edge runtime directly into the Exness (MT4/MT5) order book.
+- **Sizing Engine:** The `exness-executor` Edge Function dynamically calculates exact lot sizes based on a strict 1% risk threshold.
+- **Guardrails:** Hardcoded execution caps (`MAX_LOT_SIZE = 0.05`) mathematically insulate the portfolio from AI hallucinations or logic errors.
 
-1. **Install** (node 20+, pnpm recommended)
+### 4. Intelligence & Risk
+- **Alpha Engine:** Runs on a strict M30 (30-minute) interval to identify high-probability setups.
+- **AI Risk Officer:** Utilizes OpenAI to evaluate market structure against systemic rules, enforcing strict 1:2 R/R ratios and isolating correlated asset risk.
+
+---
+
+## 💰 Monetization Pipeline
+
+RaineBank operates two distinct, fully automated revenue streams:
+
+1. **B2C Retail Tier ($99/mo)**
+   - **Paystack Integration:** Webhooks automatically map successful checkout events to the `user_subscriptions` ledger, instantly upgrading user permissions to view the real-time Alpha feed without delay.
+2. **B2B Institutional Tier ($1,000 - $2,000/mo)**
+   - **Unkey API Gateway:** Edge-level rate limiting and key management. Institutional partners are issued raw API keys to directly ingest JSON signals into their proprietary execution engines.
+
+---
+
+## ⚙️ The Automation Flywheel
+
+The system is engineered to run completely hands-off, managing its own execution, monitoring, and marketing.
+
+- **Telegram Broadcast:** A `pg_net` database trigger pushes new `APPROVED` signals directly to the RaineBank retail Telegram channel instantly via MarkdownV2 formatting.
+- **The Retail Lifecycle (Email Drip):** Using the **Resend API**, an automated cron job nurtures free-tier users:
+  - **Day 0:** Welcome email.
+  - **Day 3:** "Proof of Edge" highlighting the best trade they missed by not upgrading.
+  - **Day 7:** Direct Paystack checkout upsell.
+- **The Watchdog:** The `system-health-ping` function monitors the database timestamps. If the primary engine stalls for >45 minutes, it isolates the failure and emails the CIO directly, keeping errors away from the retail Telegram.
+- **Metrics Amplification (The Auto-Brag):** Every Friday, the engine audits its own 7-day performance (Net R-Multiple, Win Rate) and pushes pre-formatted marketing copy to the CIO for native LinkedIn/X publishing.
+
+---
+
+## 🚀 Local Development Quick Start
+
+1. **Install Dependencies**
    ```bash
    pnpm install
    ```
 
-2. **Create .env files**  
-   - Copy `.env.example` to `.env` in `apps/web` and root and fill values.
+2. **Environment Configuration**
+   Copy `.env.example` to `.env` and fill in the required keys:
+   - `NEXT_PUBLIC_SUPABASE_URL` & `NEXT_PUBLIC_SUPABASE_ANON_KEY`
+   - `UNKEY_ROOT_KEY` & `UNKEY_API_ID`
+   - Edge Secrets (Set via `supabase secrets set`): `TELEGRAM_BOT_TOKEN`, `META_API_TOKEN`, `RESEND_API_KEY`, `PAYSTACK_SECRET_KEY`.
 
-3. **Run Next.js**
+3. **Database Initialization**
+   Run the local Supabase stack and apply migrations:
    ```bash
-   cd apps/web
+   npx supabase start
+   ```
+
+4. **Run the Next.js Frontend**
+   ```bash
    pnpm dev
    ```
 
-4. **Supabase**
-   - Create a Supabase project, run SQL from `supabase/migrations/0001_init.sql`
-   - Apply RLS policies from `supabase/policies`
-   - Enable TOTP-based MFA via `supabase/config.toml`
-   - Deploy functions:
-     ```bash
-     supabase functions deploy research-run
-     supabase functions deploy monitor-open-trades
-     ```
+5. **Deploy Edge Functions**
+   ```bash
+   npx supabase functions deploy
+   ```
 
-5. **Cron**
-   - Daily research: `30 13 * * 1-5` (60 min before U.S. market open)
-   - Optional hourly research: `0 * * * *` calls `rpc_start_research('1h')`
-   - If jobs already exist, re-run the migration or unschedule/reschedule manually:
-     ```sql
-     select cron.unschedule('daily_research');
-     select cron.schedule('daily_research', '30 13 * * 1-5', $$ select rpc_start_research('1d'); $$);
-     select cron.schedule('hourly_research', '0 * * * *', $$ select rpc_start_research('1h'); $$); -- optional
-     ```
-
-## Notes
-- Orders are **paper** by default (stubbed broker). Broker credentials are loaded from Azure Key Vault and rotated quarterly.
-- All writes go to Postgres with idempotency and full audit logs.
-- Trailing-stop tightening occurs on discrete milestones (+0.5R, +1R, …).
+---
+*Built by KobyQ. The machine now speaks.*
