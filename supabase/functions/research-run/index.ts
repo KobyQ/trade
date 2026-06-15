@@ -286,14 +286,14 @@ serve(async (req) => {
         continue;
       }
 
-      // Persist to Ledger (APPROVED)
+      // Persist to Ledger (PENDING_APPROVAL)
       const { data, error } = await supabase
         .from("trade_opportunities")
         .insert({
           symbol,
           side: dbSide,
           timeframe: timeframe.toLowerCase(),
-          status: "APPROVED",
+          status: "PENDING_APPROVAL",
           entry_plan_json: {
             price: entry_price,
             transaction_cost: txCost,
@@ -318,9 +318,20 @@ serve(async (req) => {
         const expected_loss = Math.abs(entry_price - stop_loss) * qty;
         const expected_profit = Math.abs(take_profit - entry_price) * qty;
 
+        let order_type = dbSide === 'LONG' ? 'BUY MARKET' : 'SELL MARKET';
+        // If the entry price differs from the current price by more than a tiny fraction, it's a resting order
+        if (Math.abs(entry_price - snapshot.current_price) / snapshot.current_price > 0.0005) {
+            if (dbSide === 'LONG') {
+                order_type = entry_price < snapshot.current_price ? 'BUY LIMIT' : 'BUY STOP';
+            } else {
+                order_type = entry_price > snapshot.current_price ? 'SELL LIMIT' : 'SELL STOP';
+            }
+        }
+
         results.push({ 
           symbol, 
           id: data.id,
+          order_type,
           entry_price,
           take_profit,
           stop_loss,
