@@ -87,7 +87,7 @@ export interface Bar {
 
 export async function fetchPaperBars(symbol: string, timeframe = '1D', limit = 300): Promise<Bar[]> {
   // Route Crypto/Forex/Commodity pairs to Yahoo Finance
-  const isForexOrCrypto = symbol === 'XAUUSD' || symbol.includes('USD') || symbol.includes('/');
+  const isForexOrCrypto = symbol === 'XAUUSD' || symbol === 'UKOIL' || symbol.includes('USD') || symbol.includes('/');
   
   if (isForexOrCrypto) {
     let yfSymbol = symbol;
@@ -95,6 +95,8 @@ export async function fetchPaperBars(symbol: string, timeframe = '1D', limit = 3
 
     if (symbol === 'XAUUSD' || symbol === 'XAU/USD') {
       yfSymbol = 'GC=F'; // Gold Futures as proxy for spot XAUUSD
+    } else if (symbol === 'UKOIL') {
+      yfSymbol = 'BZ=F'; // Brent Crude Oil Futures as proxy for UKOIL
     } else if (isCrypto && symbol.endsWith('USD')) {
       // BTCUSD -> BTC-USD
       yfSymbol = symbol.replace('USD', '') + '-USD';
