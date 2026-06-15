@@ -123,3 +123,4 @@ create table if not exists idempotency_keys (
 -- Example pg_cron comments (configure via dashboard)
 -- SELECT cron.schedule('daily_research', '0 13 * * 1-5', $$ select rpc_start_research('1d'); $$);
 -- SELECT cron.schedule('monitor_trades', '* * * * *', $$ select rpc_monitor_open_trades(); $$);
+GRANT ALL ON ALL TABLES IN SCHEMA public TO authenticated, anon, service_role;
