@@ -41,6 +41,7 @@ export default function LoginPage() {
         setIsLogin(true);
       }
     } catch (err: any) {
+      console.error("Login Error Caught:", err);
       setError(err.message || 'An error occurred during authentication.');
     } finally {
       setLoading(false);
