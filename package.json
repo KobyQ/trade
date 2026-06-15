@@ -16,6 +16,8 @@
   "scripts": {
     "build": "pnpm -r build",
     "dev": "pnpm --filter @ai-trading/web dev",
+    "dev:backend": "supabase start && supabase functions serve --env-file .env",
+    "dev:all": "docker-compose down && supabase start && (supabase functions serve --env-file .env & pnpm --filter @ai-trading/web dev)",
     "lint": "pnpm -r lint",
     "test": "pnpm -r test"
   }
