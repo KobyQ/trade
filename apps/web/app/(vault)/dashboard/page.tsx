@@ -58,7 +58,13 @@ export default function VaultDashboard() {
   useEffect(() => {
     const loadSignals = async () => {
       try {
-        const res = await fetch(`/api/vault/signals?page=${page}&limit=10`);
+        const res = await fetch(`/api/vault/signals?page=${page}&limit=10`, {
+          cache: 'no-store',
+          headers: {
+            'Cache-Control': 'no-cache',
+            'Pragma': 'no-cache'
+          }
+        });
         const data = await res.json();
 
         if (res.ok) {

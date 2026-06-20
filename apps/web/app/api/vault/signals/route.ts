@@ -1,3 +1,5 @@
+export const dynamic = 'force-dynamic';
+
 import { NextResponse } from 'next/server';
 import { supabaseServer } from '@lib/supabase-server';
 import { createClient } from '@supabase/supabase-js';
@@ -25,11 +27,13 @@ export async function GET(request: Request) {
   );
 
   // Fetch subscription tier
-  const { data: sub } = await adminClient
+  const { data: sub, error: subError } = await adminClient
     .from('user_subscriptions')
     .select('plan_tier, status')
     .eq('user_id', user.id)
     .single();
+
+  console.log('[DEBUG /api/vault/signals]', { userId: user.id, sub, subError });
 
   const is_pro = sub?.plan_tier === 'alpha' && sub?.status === 'active';
 
