@@ -117,7 +117,7 @@ CRITICAL: The values referenced inside your rationale object MUST perfectly matc
     "if_then_scenario": "Map out exactly what price action would create/invalidate a valid entry.",
     "confluence_check": "Evaluate moving averages and volume against the RSI. (Mandatory)"
   }
-}\`;
+}`;
 
   const direction = snapshot.trend_alignment.startsWith('BULLISH') ? 'LONG (BUY)' : 'SHORT (SELL)';
   const userPrompt = `Evaluate the ${snapshot.trend_alignment} setup for ${symbol} on the ${timeframe} timeframe at current price ${snapshot.current_price} for a potential ${direction} position. Return the required JSON object execution profile.`;
