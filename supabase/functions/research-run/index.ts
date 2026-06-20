@@ -55,7 +55,7 @@ async function saveBars(
   }
 }
 
-async function evaluateOpportunity(symbol: string, snapshot: LogicContext) {
+async function evaluateOpportunity(symbol: string, snapshot: LogicContext, timeframe: string) {
   const openaiKey = Deno.env.get("OPENAI_API_KEY");
   const azureKey = Deno.env.get("AZURE_OPENAI_API_KEY");
   
@@ -83,21 +83,44 @@ RULES:
 2. TREND breakouts (BULLISH_TREND or BEARISH_TREND) are accepted only if RSI is not over-extended.
    - For a Breakout LONG, your entry price MUST be ABOVE the current price (Buy Stop).
    - For a Breakout SHORT, your entry price MUST be BELOW the current price (Sell Stop).
-4. STOP LOSS LOGIC: The absolute safe volatility boundaries have already been mathematically pre-calculated for you in the snapshot. You MUST NOT calculate this yourself.
+3. STOP LOSS LOGIC: The absolute safe volatility boundaries have already been mathematically pre-calculated for you in the snapshot. You MUST NOT calculate this yourself.
    - For LONG trades, your Stop Loss MUST be strictly LESS THAN OR EQUAL TO the \`safe_long_stop_loss\` provided in the snapshot.
    - For SHORT trades, your Stop Loss MUST be strictly GREATER THAN OR EQUAL TO the \`safe_short_stop_loss\` provided in the snapshot.
    - CRITICAL: Do not attempt to do float math. Simply select a Stop Loss value that obeys the pre-calculated boundary condition.
-5. FUNDAMENTAL REALITY CHECK: If \`fundamental_context\` is provided in the snapshot, you MUST evaluate whether the technical setup contradicts the macro reality.
+4. FUNDAMENTAL REALITY CHECK: If \`fundamental_context\` is missing, null, or 'No fundamental news provided.', you MUST base your decision purely on technicals, but explicitly note the lack of macro visibility in your rationale. If \`fundamental_context\` IS provided, you MUST evaluate whether the technical setup contradicts the macro reality.
    - You MUST explicitly evaluate if the news is BULLISH or BEARISH for the asset.
    - Example (Oil): A peace pact, reopening of supply routes, or lower institutional price forecasts is strictly BEARISH. You must NOT interpret falling prices as a "bullish stabilization".
    - If the fundamental reality is BEARISH, you MUST REJECT any LONG setups.
    - If the fundamental reality is BULLISH, you MUST REJECT any SHORT setups.
    - NEVER buy a fundamental crash just because the RSI looks cheap or the trend was previously bullish. If the fundamental context invalidates the technical trend, reject the trade.
+5. INSTITUTIONAL RATIONALE REQUIREMENTS: Your rationale must be highly detailed and mature. You must cover all angles of the trade.
 
 Current Market Context:
-${JSON.stringify(snapshot, null, 2)}`;
+${JSON.stringify(snapshot, null, 2)}
 
-  const userPrompt = `Evaluate the ${snapshot.trend_alignment} setup for ${symbol} at price ${snapshot.current_price}. Provide the execution parameters and rationale.`;
+6. OUTPUT FORMAT: You MUST respond strictly with a raw JSON object matching the exact schema below. Do not include any markdown formatting (like \`\`\`json), wrapper text, or conversational preambles. 
+CRITICAL: The values referenced inside your rationale object MUST perfectly match the execution_parameters.
+
+{
+  "setup_valid": boolean,
+  "action": "APPROVED" | "REJECTED",
+  "execution_parameters": {
+    "entry_type": "Buy Limit" | "Sell Limit" | "Buy Stop" | "Sell Stop" | "NONE",
+    "suggested_entry_price": number | null,
+    "suggested_stop_loss": number | null
+  },
+  "confidence_score": number,
+  "institutional_rationale": {
+    "timeframe_context": "Explain how the ${timeframe} impacts the weight of the RSI and setup.",
+    "key_levels": "Define structural boundaries, nearest support/resistance.",
+    "intermarket_context": "Specify EXACT macro correlations (e.g., MUST mention DXY or US10Y for Gold/Forex; do not use generic terms).",
+    "if_then_scenario": "Map out exactly what price action would create/invalidate a valid entry.",
+    "confluence_check": "Evaluate moving averages and volume against the RSI. (Mandatory)"
+  }
+}\`;
+
+  const direction = snapshot.trend_alignment.startsWith('BULLISH') ? 'LONG (BUY)' : 'SHORT (SELL)';
+  const userPrompt = `Evaluate the ${snapshot.trend_alignment} setup for ${symbol} on the ${timeframe} timeframe at current price ${snapshot.current_price} for a potential ${direction} position. Return the required JSON object execution profile.`;
 
   const response = await openai.chat.completions.create({
     model: "gpt-4o-mini",
@@ -113,12 +136,32 @@ ${JSON.stringify(snapshot, null, 2)}`;
           type: "object",
           properties: {
             setup_valid: { type: "boolean" },
-            entry_price: { type: "number" },
-            stop_loss: { type: "number" },
+            action: { type: "string" },
+            execution_parameters: {
+              type: "object",
+              properties: {
+                entry_type: { type: "string" },
+                suggested_entry_price: { type: ["number", "null"] },
+                suggested_stop_loss: { type: ["number", "null"] }
+              },
+              required: ["entry_type", "suggested_entry_price", "suggested_stop_loss"],
+              additionalProperties: false
+            },
             confidence_score: { type: "number" },
-            institutional_rationale: { type: "string" }
+            institutional_rationale: {
+              type: "object",
+              properties: {
+                timeframe_context: { type: "string" },
+                key_levels: { type: "string" },
+                intermarket_context: { type: "string" },
+                if_then_scenario: { type: "string" },
+                confluence_check: { type: "string" }
+              },
+              required: ["timeframe_context", "key_levels", "intermarket_context", "if_then_scenario", "confluence_check"],
+              additionalProperties: false
+            }
           },
-          required: ["setup_valid", "entry_price", "stop_loss", "confidence_score", "institutional_rationale"],
+          required: ["setup_valid", "action", "execution_parameters", "confidence_score", "institutional_rationale"],
           additionalProperties: false
         },
         strict: true
@@ -142,7 +185,7 @@ ${JSON.stringify(snapshot, null, 2)}`;
  * - `model_id`  Optional model identifier (for audit)
  * - `model_version` Optional model version (for audit)
  */
-serve(async (req) => {
+serve((req) => {
   const { searchParams } = new URL(req.url);
   const timeframe = searchParams.get("timeframe") ?? "1D";
   const modelId = searchParams.get("model_id") ?? undefined;
@@ -154,227 +197,331 @@ serve(async (req) => {
 
   const url = Deno.env.get("SUPABASE_URL");
   const key = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
+
   if (!url || !key) {
     return new Response(
       JSON.stringify({ ok: false, error: "missing env" }),
       { status: 500, headers: { "content-type": "application/json" } },
     );
   }
+  
   const supabase = createClient(url, key, {
     auth: { persistSession: false },
     global: { headers: { Authorization: `Bearer ${key}` } },
   });
 
-  const results: any[] = [];
-  console.log(`[Research Run] Starting pipeline for symbols: ${symbols.join(", ")}`);
-  for (const symbol of symbols) {
-    try {
-      await insertAuditLog(supabase, {
-        actor_type: "SYSTEM",
-        action: "RESEARCH_RUN",
-        entity_type: "research",
-        payload_json: { symbol, timeframe, model_id: modelId, model_version: modelVersion },
-      });
+  const body = new ReadableStream({
+    async start(controller) {
+      function sendEvent(data: any) {
+        try {
+          controller.enqueue(new TextEncoder().encode(`data: ${JSON.stringify(data)}\n\n`));
+        } catch (e) {
+          console.error("Stream closed", e);
+        }
+      }
 
-      let bars: Bar[];
+      const results: any[] = [];
+      const rejections: any[] = [];
+      
       try {
-        console.log(`[Data Fetch] Fetching market data for ${symbol}...`);
-        bars = await fetchPaperBars(symbol, timeframe);
-      } catch (err: any) {
-        console.error(`[Data Fetch Error] Failed to fetch data for ${symbol}: ${err.message}`);
-        await insertAuditLog(supabase, {
-          actor_type: "SYSTEM",
-          action: "API_TIMEOUT",
-          entity_type: "research",
-          payload_json: { symbol, reason: "Market data fetch failed", error: err.message },
-        });
-        continue;
-      }
-      
-      console.log(`\n[Info] [Data Fetch] Successfully fetched ${bars.length} bars for ${symbol}.`);
+        console.log(`[Research Run] Starting pipeline for symbols: ${symbols.join(", ")}`);
+        sendEvent({ type: 'progress', message: `Starting analysis pipeline for: ${symbols.join(", ")}` });
+        
+        for (const symbol of symbols) {
+          try {
+            await insertAuditLog(supabase, {
+              actor_type: "SYSTEM",
+              action: "RESEARCH_RUN",
+              entity_type: "research",
+              payload_json: { symbol, timeframe, model_id: modelId, model_version: modelVersion },
+            });
 
-      // Store fetched bars in PTI database asynchronously
-      saveBars(supabase, symbol, timeframe, bars).catch(err => 
-        console.error(`[Error] Failed to save bars for ${symbol}:`, err)
-      );
-
-      // LAYER A: Deterministic Evaluation Guard
-      const rawSnapshot = getContextSnapshot(
-        bars.map((b) => b.t),
-        bars.map((b) => b.h),
-        bars.map((b) => b.l),
-        bars.map((b) => b.c)
-      );
-      
-      // Inject macro context if provided via URL params
-      const snapshot = {
-        ...rawSnapshot,
-        fundamental_context: newsContext || "No fundamental news provided."
-      };
-
-      console.log(`[Strategy Eval] Market snapshot for ${symbol}: Trend=${snapshot.trend_alignment}, RSI=${snapshot.rsi_14.toFixed(2)}, CurrentPrice=${snapshot.current_price}`);
-      
-      // LAYER A: Deterministic Guard
-      if (snapshot.trend_alignment === 'CHOP') {
-        console.log(`[Layer A: Deterministic Guard] REJECTED ${symbol}: Market is in CHOP regime. No clear trend.`);
-        await insertAuditLog(supabase, {
-          actor_type: "SYSTEM",
-          action: "RESEARCH_HALTED",
-          entity_type: "research",
-          payload_json: { symbol, reason: "CHOP_REGIME", context: snapshot },
-        });
-        continue;
-      }
-
-      // LAYER B: Cognitive Guard (Senior Risk Officer)
-      let evaluation;
-      try {
-        console.log(`[Layer B: Cognitive Guard] Requesting AI evaluation for ${symbol}...`);
-        evaluation = await evaluateOpportunity(symbol, snapshot);
-      } catch (err: any) {
-        console.error(`[Layer B Error] AI evaluation failed for ${symbol}: ${err.message}`);
-        await insertAuditLog(supabase, {
-          actor_type: "SYSTEM",
-          action: "API_TIMEOUT",
-          entity_type: "research",
-          payload_json: { symbol, reason: "OpenAI evaluation failed or timed out", error: err.message },
-        });
-        continue;
-      }
-
-      console.log(`[Layer B: Cognitive Guard] AI Response for ${symbol}: Valid Setup = ${evaluation.setup_valid}`);
-      console.log(`[Layer B] AI Rationale: ${evaluation.institutional_rationale}`);
-
-      if (!evaluation.setup_valid) {
-        console.log(`[Layer B: Cognitive Guard] REJECTED ${symbol} by AI Risk Officer.`);
-        await insertAuditLog(supabase, {
-          actor_type: "SYSTEM",
-          action: "REJECTED_BY_AI",
-          entity_type: "research",
-          payload_json: { symbol, reason: evaluation.institutional_rationale, context: snapshot },
-        });
-        continue;
-      }
-
-      // LAYER C: Risk Manager (The Kill Switch)
-      const riskValidation = await validateExposure(supabase, symbol);
-
-      const { entry_price, stop_loss, confidence_score, institutional_rationale } = evaluation;
-
-      const dbSide = snapshot.trend_alignment.startsWith('BULLISH') ? 'LONG' : 'SHORT';
-      
-      // LAYER C: Deterministic Risk/Reward Math (Force exactly 1:2 R:R)
-      const risk = Math.abs(entry_price - stop_loss);
-      const take_profit = dbSide === 'LONG' ? entry_price + (risk * 2) : entry_price - (risk * 2);
-
-      const qty = 1;
-      const commission = 0.01;
-      const slippageBps = 5;
-      const grossEdge = dbSide === 'LONG' ? take_profit - entry_price : entry_price - take_profit;
-      const txCost = transactionCost(qty, commission);
-      const slip = slippage(entry_price, qty, slippageBps);
-      const net = netEdge(grossEdge, entry_price, qty, commission, slippageBps);
-      const expectedReturn = net / entry_price;
-
-      if (!riskValidation.valid) {
-        console.log(`[Layer C: Risk Manager] REJECTED ${symbol}: ${riskValidation.reason}`);
-        await insertAuditLog(supabase, {
-          actor_type: "SYSTEM",
-          action: "REJECTED_BY_RISK",
-          entity_type: "research",
-          payload_json: { symbol, reason: riskValidation.reason, context: snapshot },
-        });
-
-        // Save as REJECTED
-        await supabase.from("trade_opportunities").insert({
-          symbol,
-          side: dbSide,
-          timeframe: timeframe.toLowerCase(),
-          status: "REJECTED",
-          entry_plan_json: { price: entry_price, transaction_cost: txCost, slippage: slip, net_edge: net },
-          stop_plan_json: { stop: stop_loss },
-          take_profit_json: { tp: take_profit },
-          risk_summary: riskValidation.reason,
-          expected_return: expectedReturn,
-          confidence: confidence_score,
-          ai_summary: institutional_rationale,
-          ai_risks: "REJECTED BY RISK DESK",
-          model_id: modelId,
-          model_version: modelVersion,
-        });
-        continue;
-      }
-
-      // Persist to Ledger (PENDING_APPROVAL)
-      const { data, error } = await supabase
-        .from("trade_opportunities")
-        .insert({
-          symbol,
-          side: dbSide,
-          timeframe: timeframe.toLowerCase(),
-          status: "PENDING_APPROVAL",
-          entry_plan_json: {
-            price: entry_price,
-            transaction_cost: txCost,
-            slippage: slip,
-            net_edge: net,
-          },
-          stop_plan_json: { stop: stop_loss },
-          take_profit_json: { tp: take_profit },
-          risk_summary: `RSI ${snapshot.rsi_14}`,
-          expected_return: expectedReturn,
-          confidence: confidence_score,
-          ai_summary: institutional_rationale,
-          ai_risks: "Managed by AI Risk Officer",
-          model_id: modelId,
-          model_version: modelVersion,
-        })
-        .select("id")
-        .single();
-
-      if (!error && data) {
-        console.log(`[Success] Opportunity generated for ${symbol}: ID ${data.id}`);
-        const expected_loss = Math.abs(entry_price - stop_loss) * qty;
-        const expected_profit = Math.abs(take_profit - entry_price) * qty;
-
-        let order_type = dbSide === 'LONG' ? 'BUY MARKET' : 'SELL MARKET';
-        // If the entry price differs from the current price by more than a tiny fraction, it's a resting order
-        if (Math.abs(entry_price - snapshot.current_price) / snapshot.current_price > 0.0005) {
-            if (dbSide === 'LONG') {
-                order_type = entry_price < snapshot.current_price ? 'BUY LIMIT' : 'BUY STOP';
-            } else {
-                order_type = entry_price > snapshot.current_price ? 'SELL LIMIT' : 'SELL STOP';
+            let bars: Bar[];
+            try {
+              console.log(`[Data Fetch] Fetching market data for ${symbol}...`);
+              sendEvent({ type: 'progress', message: `[Data Fetch] Fetching historical price data for ${symbol}...` });
+              bars = await fetchPaperBars(symbol, timeframe);
+            } catch (err: any) {
+              console.error(`[Data Fetch Error] Failed to fetch data for ${symbol}: ${err.message}`);
+              await insertAuditLog(supabase, {
+                actor_type: "SYSTEM",
+                action: "API_TIMEOUT",
+                entity_type: "research",
+                payload_json: { symbol, reason: "Market data fetch failed", error: err.message },
+              });
+              rejections.push({
+                symbol,
+                reason: `Data Fetch Error: ${err.message}`,
+                layer: "Data"
+              });
+              continue;
             }
+            
+            console.log(`\n[Info] [Data Fetch] Successfully fetched ${bars.length} bars for ${symbol}.`);
+            sendEvent({ type: 'progress', message: `[Data Fetch] Successfully acquired ${bars.length} data points.` });
+
+            // Store fetched bars in PTI database asynchronously
+            saveBars(supabase, symbol, timeframe, bars).catch(err => 
+              console.error(`[Error] Failed to save bars for ${symbol}:`, err)
+            );
+
+            // LAYER A: Deterministic Evaluation Guard
+            sendEvent({ type: 'progress', message: `[Layer A: Deterministic Guard] Evaluating mathematical momentum and regime...` });
+            const rawSnapshot = getContextSnapshot(
+              bars.map((b) => b.t),
+              bars.map((b) => b.h),
+              bars.map((b) => b.l),
+              bars.map((b) => b.c)
+            );
+            
+            // Inject macro context if provided via URL params
+            const snapshot = {
+              ...rawSnapshot,
+              fundamental_context: newsContext || "No fundamental news provided."
+            };
+
+            console.log(`[Strategy Eval] Market snapshot for ${symbol}: Trend=${snapshot.trend_alignment}, RSI=${snapshot.rsi_14.toFixed(2)}, CurrentPrice=${snapshot.current_price}`);
+            
+            // LAYER A: Deterministic Guard
+            if (snapshot.trend_alignment === 'CHOP') {
+              console.log(`[Layer A: Deterministic Guard] REJECTED ${symbol}: Market is in CHOP regime. No clear trend.`);
+              sendEvent({ type: 'progress', message: `[Layer A: Deterministic Guard] REJECTED ${symbol}: Market is in CHOP regime.` });
+              await insertAuditLog(supabase, {
+                actor_type: "SYSTEM",
+                action: "RESEARCH_HALTED",
+                entity_type: "research",
+                payload_json: { symbol, reason: "CHOP_REGIME", context: snapshot },
+              });
+              rejections.push({
+                symbol,
+                reason: "Deterministic Guard: Market is in CHOP regime. No clear trend.",
+                layer: "A"
+              });
+              continue;
+            }
+
+            // LAYER B: Cognitive Guard (Senior Risk Officer)
+            let evaluation;
+            try {
+              console.log(`[Layer B: Cognitive Guard] Requesting AI evaluation for ${symbol}...`);
+              sendEvent({ type: 'progress', message: `[Layer B: AI Risk Officer] Evaluating institutional rationale and key levels for ${snapshot.trend_alignment} setup...` });
+              evaluation = await evaluateOpportunity(symbol, snapshot, timeframe);
+            } catch (err: any) {
+              console.error(`[Layer B Error] AI evaluation failed for ${symbol}: ${err.message}`);
+              sendEvent({ type: 'progress', message: `[Layer B: AI Risk Officer] Evaluation failed: ${err.message}` });
+              await insertAuditLog(supabase, {
+                actor_type: "SYSTEM",
+                action: "API_TIMEOUT",
+                entity_type: "research",
+                payload_json: { symbol, reason: "OpenAI evaluation failed or timed out", error: err.message },
+              });
+              rejections.push({
+                symbol,
+                reason: `AI Evaluation Error: ${err.message}`,
+                layer: "B"
+              });
+              continue;
+            }
+
+            const is_valid = evaluation.setup_valid && evaluation.action !== "REJECTED";
+            
+            const dbSide = snapshot.trend_alignment.startsWith('BULLISH') ? 'LONG' : 'SHORT';
+            const entry_price = evaluation.execution_parameters?.suggested_entry_price || snapshot.current_price;
+            const stop_loss = evaluation.execution_parameters?.suggested_stop_loss || (dbSide === "LONG" ? snapshot.safe_long_stop_loss : snapshot.safe_short_stop_loss);
+            const confidence_score = evaluation.confidence_score || 50;
+            
+            const rationaleObj = evaluation.institutional_rationale || {};
+            const institutional_rationale = [
+              rationaleObj.timeframe_context,
+              rationaleObj.key_levels,
+              rationaleObj.intermarket_context,
+              rationaleObj.if_then_scenario,
+              rationaleObj.confluence_check
+            ].filter(Boolean).join(" ");
+
+            console.log(`[Layer B: Cognitive Guard] AI Response for ${symbol}: Valid Setup = ${is_valid}`);
+            console.log(`[Layer B] AI Rationale: ${institutional_rationale}`);
+
+            if (!is_valid) {
+              console.log(`[Layer B: Cognitive Guard] REJECTED ${symbol} by AI Risk Officer.`);
+              sendEvent({ type: 'progress', message: `[Layer B: AI Risk Officer] REJECTED ${symbol} based on institutional logic.` });
+              await insertAuditLog(supabase, {
+                actor_type: "SYSTEM",
+                action: "REJECTED_BY_AI",
+                entity_type: "research",
+                payload_json: { symbol, reason: institutional_rationale, context: snapshot },
+              });
+              rejections.push({
+                symbol,
+                reason: institutional_rationale,
+                layer: "Cognitive AI"
+              });
+              continue;
+            }
+
+            console.log(`[Layer B: Cognitive Guard] APPROVED ${symbol} by AI Risk Officer.`);
+            sendEvent({ type: 'progress', message: `[Layer B: Cognitive Guard] APPROVED by AI Risk Officer.` });
+
+            // LAYER C: Risk Manager (The Kill Switch)
+            sendEvent({ type: 'progress', message: `[Layer C: Risk Manager] Validating exposure and portfolio allocation...` });
+            const riskValidation = await validateExposure(supabase, symbol);
+
+            // LAYER C: Deterministic Risk/Reward Math (Force exactly 1:2 R:R)
+            const risk = Math.abs(entry_price - stop_loss);
+            const take_profit = dbSide === 'LONG' ? entry_price + (risk * 2) : entry_price - (risk * 2);
+
+            const qty = 100;
+            const commission = 0.01;
+            const slippageBps = 5;
+            const grossEdge = dbSide === 'LONG' ? take_profit - entry_price : entry_price - take_profit;
+            const txCost = transactionCost(qty, commission);
+            const slip = slippage(entry_price, qty, slippageBps);
+            const net = netEdge(grossEdge, entry_price, qty, commission, slippageBps);
+            
+            const riskAmount = Math.abs(entry_price - stop_loss) * qty;
+            const expectedReturn = Math.abs(take_profit - entry_price) * qty;
+            const rrRatio = riskAmount > 0 ? expectedReturn / riskAmount : 0;
+            const expectedReturnPct = expectedReturn / entry_price;
+
+            if (!riskValidation.valid) {
+              console.log(`[Layer C: Risk Manager] REJECTED ${symbol}: ${riskValidation.reason}`);
+              sendEvent({ type: 'progress', message: `[Layer C: Risk Manager] REJECTED ${symbol}: Exposure constraints violated.` });
+              await insertAuditLog(supabase, {
+                actor_type: "SYSTEM",
+                action: "REJECTED_BY_RISK",
+                entity_type: "research",
+                payload_json: { symbol, reason: riskValidation.reason, context: snapshot },
+              });
+
+              await supabase.from("trade_opportunities").insert({
+                symbol,
+                side: dbSide,
+                timeframe: timeframe.toLowerCase(),
+                status: "REJECTED",
+                entry_plan_json: { price: entry_price, transaction_cost: txCost, slippage: slip, net_edge: net },
+                stop_plan_json: { stop: stop_loss },
+                take_profit_json: { tp: take_profit },
+                risk_summary: riskValidation.reason,
+                expected_return: expectedReturnPct,
+                confidence: confidence_score,
+                ai_summary: institutional_rationale,
+                ai_risks: "REJECTED BY RISK DESK",
+                model_id: modelId,
+                model_version: modelVersion,
+              });
+              rejections.push({
+                symbol,
+                reason: riskValidation.reason,
+                rationale: institutional_rationale,
+                layer: "Risk Manager"
+              });
+              continue;
+            }
+
+            console.log(`\n[Info] [Layer C: Execution Desk] Validating risk parameters for ${symbol}...`);
+            sendEvent({ type: 'progress', message: `[Layer C: Execution Desk] Validating risk parameters for ${symbol}...` });
+            
+            if (rrRatio < 1.9) {
+              console.log(`[Layer C: Execution Desk] REJECTED ${symbol}: R/R Ratio too low (${rrRatio.toFixed(2)}). Minimum 2.0 required.`);
+              sendEvent({ type: 'progress', message: `[Layer C: Execution Desk] REJECTED: R/R Ratio too low (${rrRatio.toFixed(2)}).` });
+              rejections.push({
+                symbol,
+                reason: `Risk/Reward ratio ${rrRatio.toFixed(2)} is below institutional minimum of 2.0`,
+                layer: "Execution Desk"
+              });
+              continue;
+            }
+
+            console.log(`[Layer C: Execution Desk] APPROVED ${symbol}: Generating pending opportunity...`);
+            sendEvent({ type: 'progress', message: `[Execution] Creating opportunity for ${symbol}...` });
+            const { data, error } = await supabase
+              .from("trade_opportunities")
+              .insert({
+                symbol,
+                side: dbSide,
+                timeframe: timeframe.toLowerCase(),
+                status: "PENDING_APPROVAL",
+                entry_plan_json: {
+                  price: entry_price,
+                  transaction_cost: txCost,
+                  slippage: slip,
+                  net_edge: net,
+                },
+                stop_plan_json: { stop: stop_loss },
+                take_profit_json: { tp: take_profit },
+                risk_summary: `RSI ${snapshot.rsi_14}`,
+                expected_return: expectedReturn,
+                confidence: confidence_score,
+                ai_summary: institutional_rationale,
+                ai_risks: "Managed by AI Risk Officer",
+                model_id: modelId,
+                model_version: modelVersion,
+              })
+              .select("id")
+              .single();
+
+            if (!error && data) {
+              console.log(`[Success] Opportunity generated for ${symbol}: ID ${data.id}`);
+              sendEvent({ type: 'progress', message: `[Success] Opportunity generated for ${symbol}` });
+              
+              const expected_loss = Math.abs(entry_price - stop_loss) * qty;
+              const expected_profit = Math.abs(take_profit - entry_price) * qty;
+
+              let order_type = dbSide === 'LONG' ? 'BUY MARKET' : 'SELL MARKET';
+              if (Math.abs(entry_price - snapshot.current_price) / snapshot.current_price > 0.0005) {
+                  if (dbSide === 'LONG') {
+                      order_type = entry_price < snapshot.current_price ? 'BUY LIMIT' : 'BUY STOP';
+                  } else {
+                      order_type = entry_price > snapshot.current_price ? 'SELL LIMIT' : 'SELL STOP';
+                  }
+              }
+
+              results.push({ 
+                symbol, 
+                id: data.id,
+                order_type,
+                entry_price,
+                take_profit,
+                stop_loss,
+                expected_loss,
+                expected_profit
+              });
+
+              await insertAuditLog(supabase, {
+                actor_type: "SYSTEM",
+                action: "OPPORTUNITY_CREATED",
+                entity_type: "trade_opportunity",
+                entity_id: data.id,
+                payload_json: { symbol, timeframe, model_id: modelId, model_version: modelVersion },
+              });
+            } else if (error) {
+              console.error(`[Database Error] Failed to insert opportunity for ${symbol}: ${error.message}`);
+              sendEvent({ type: 'progress', message: `[Database Error] ${error.message}` });
+            }
+          } catch (globalErr: any) {
+            console.error(`[Global Error] Unexpected error processing ${symbol}: ${globalErr.message}`);
+            sendEvent({ type: 'progress', message: `[System Error] ${globalErr.message}` });
+            rejections.push({
+              symbol,
+              reason: `System Error: ${globalErr.message}`,
+              layer: "System"
+            });
+            continue;
+          }
         }
 
-        results.push({ 
-          symbol, 
-          id: data.id,
-          order_type,
-          entry_price,
-          take_profit,
-          stop_loss,
-          expected_loss,
-          expected_profit
-        });
-
-        await insertAuditLog(supabase, {
-          actor_type: "SYSTEM",
-          action: "OPPORTUNITY_CREATED",
-          entity_type: "trade_opportunity",
-          entity_id: data.id,
-          payload_json: { symbol, timeframe, model_id: modelId, model_version: modelVersion },
-        });
-      } else if (error) {
-        console.error(`[Database Error] Failed to insert opportunity for ${symbol}: ${error.message}`);
+        sendEvent({ type: 'complete', opportunities: results, rejections });
+      } finally {
+        controller.close();
       }
-    } catch (globalErr: any) {
-      console.error(`[Global Error] Unexpected error processing ${symbol}: ${globalErr.message}`);
-      continue;
     }
-  }
+  });
 
-  return new Response(JSON.stringify({ ok: true, opportunities: results }), {
-    headers: { "content-type": "application/json" },
+  return new Response(body, {
+    headers: {
+      "Content-Type": "text/event-stream",
+      "Cache-Control": "no-cache",
+      "Connection": "keep-alive"
+    },
   });
 });
