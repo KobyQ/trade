@@ -37,8 +37,9 @@ export default function VaultLayout({ children }: { children: React.ReactNode })
               <Logo />
             </Link>
             <div style={{ display: 'flex', gap: '24px', alignItems: 'center', color: '#9ca3af', fontSize: '14px', fontWeight: 500 }} className="md-flex hidden-mobile">
-              <Link href="/dashboard" style={{ color: 'inherit', textDecoration: 'none' }}>Vault</Link>
+              <Link href="/research" style={{ color: 'inherit', textDecoration: 'none' }}>Research</Link>
               <Link href="/opportunities" style={{ color: 'inherit', textDecoration: 'none' }}>Signals</Link>
+              <Link href="/dashboard" style={{ color: 'inherit', textDecoration: 'none' }}>Vault</Link>
               <Link href="/trades" style={{ color: 'inherit', textDecoration: 'none' }}>Ledger</Link>
               <Link href="/docs" style={{ color: 'inherit', textDecoration: 'none' }}>API Docs</Link>
             </div>
