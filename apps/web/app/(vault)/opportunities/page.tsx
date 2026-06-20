@@ -21,18 +21,31 @@ export default function Page() {
   const [loading, setLoading] = useState(true);
   const [processing, setProcessing] = useState<string | null>(null);
 
+  // Pagination State
+  const [page, setPage] = useState(1);
+  const pageSize = 10;
+  const [hasMore, setHasMore] = useState(false);
+
   useEffect(() => {
     const load = async () => {
-      const { data } = await client
+      setLoading(true);
+      const from = (page - 1) * pageSize;
+      const to = from + pageSize - 1;
+
+      const { data, count } = await client
         .from('trade_opportunities')
-        .select('id, symbol, side, timeframe, created_at, entry_plan_json, stop_plan_json, take_profit_json, ai_summary')
+        .select('id, symbol, side, timeframe, created_at, entry_plan_json, stop_plan_json, take_profit_json, ai_summary', { count: 'exact' })
         .eq('status', 'PENDING_APPROVAL')
-        .order('created_at', { ascending: false });
+        .eq('is_archived', false)
+        .order('created_at', { ascending: false })
+        .range(from, to);
+
       setOpps(data ?? []);
+      setHasMore(count ? (from + pageSize) < count : false);
       setLoading(false);
     };
     load();
-  }, [client]);
+  }, [client, page]);
 
   const approve = async (id: string) => {
     setProcessing(id);
@@ -46,6 +59,16 @@ export default function Page() {
     await client
       .from('trade_opportunities')
       .update({ status: 'REJECTED' })
+      .eq('id', id);
+    setOpps((prev) => prev.filter((o) => o.id !== id));
+    setProcessing(null);
+  };
+
+  const archive = async (id: string) => {
+    setProcessing(id);
+    await client
+      .from('trade_opportunities')
+      .update({ is_archived: true })
       .eq('id', id);
     setOpps((prev) => prev.filter((o) => o.id !== id));
     setProcessing(null);
@@ -149,6 +172,23 @@ export default function Page() {
               </div>
 
               <div style={{ display: 'flex', gap: '12px', justifyContent: 'flex-end', borderTop: '1px solid rgba(255,255,255,0.05)', paddingTop: '24px' }}>
+                  <button 
+                  onClick={() => archive(signal.id)}
+                  style={{
+                    padding: '10px 24px',
+                    background: 'transparent',
+                    border: '1px solid rgba(156,163,175,0.3)',
+                    color: '#9ca3af',
+                    borderRadius: '8px',
+                    fontWeight: 600,
+                    cursor: 'pointer',
+                    transition: 'all 0.2s',
+                  }}
+                  onMouseOver={(e) => { e.currentTarget.style.background = 'rgba(156,163,175,0.1)'; e.currentTarget.style.borderColor = '#9ca3af'; }}
+                  onMouseOut={(e) => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.borderColor = 'rgba(156,163,175,0.3)'; }}
+                >
+                  Archive
+                </button>
                 <button 
                   onClick={() => reject(signal.id)}
                   style={{
@@ -189,6 +229,42 @@ export default function Page() {
           );
         })}
       </div>
+
+      {!(page === 1 && !hasMore) && (
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '32px' }}>
+          <button
+            onClick={() => setPage((p) => Math.max(1, p - 1))}
+            disabled={page === 1}
+            style={{
+              padding: '10px 24px',
+              background: page === 1 ? 'rgba(255,255,255,0.05)' : '#262626',
+              color: page === 1 ? '#6b7280' : '#fff',
+              border: 'none',
+              borderRadius: '8px',
+              cursor: page === 1 ? 'not-allowed' : 'pointer',
+              fontWeight: 600
+            }}
+          >
+            Previous
+          </button>
+          <div style={{ color: '#9ca3af', fontSize: '14px' }}>Page {page}</div>
+          <button
+            onClick={() => setPage((p) => p + 1)}
+            disabled={!hasMore}
+            style={{
+              padding: '10px 24px',
+              background: !hasMore ? 'rgba(255,255,255,0.05)' : '#262626',
+              color: !hasMore ? '#6b7280' : '#fff',
+              border: 'none',
+              borderRadius: '8px',
+              cursor: !hasMore ? 'not-allowed' : 'pointer',
+              fontWeight: 600
+            }}
+          >
+            Next
+          </button>
+        </div>
+      )}
     </div>
   );
 }
