@@ -10,3 +10,4 @@ services:
     env_file:
       - apps/web/.env.local
     restart: unless-stopped
+

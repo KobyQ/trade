@@ -18,6 +18,7 @@
     "dev": "pnpm --filter @ai-trading/web dev",
     "dev:backend": "supabase start && supabase functions serve --env-file .env",
     "dev:all": "docker-compose down && supabase start && (supabase functions serve --env-file .env & pnpm --filter @ai-trading/web dev)",
+    "start:docker": "supabase start && (supabase functions serve --env-file .env & docker compose up --build)",
     "lint": "pnpm -r lint",
     "test": "pnpm -r test"
   }

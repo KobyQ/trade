@@ -47,6 +47,7 @@ export async function GET(request: Request) {
       .from('trade_opportunities')
       .select('id, symbol, side, timeframe, status, created_at, entry_plan_json, stop_plan_json, take_profit_json, ai_summary')
       .eq('status', 'active')
+      .or('is_archived.eq.false,is_archived.is.null')
       .order('created_at', { ascending: false })
       .limit(limit);
 

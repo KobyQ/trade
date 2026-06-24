@@ -42,6 +42,7 @@ export async function GET(request: Request) {
     const { data, count, error } = await adminClient
       .from('trade_opportunities')
       .select('*', { count: 'exact' })
+      .or('is_archived.eq.false,is_archived.is.null')
       .order('created_at', { ascending: false })
       .range(from, to);
       
@@ -63,6 +64,7 @@ export async function GET(request: Request) {
       // Note: intentionally excluding stop_plan_json, take_profit_json, entry_plan_json, and ai_summary
       .select('id, symbol, side, timeframe, status, created_at', { count: 'exact' })
       .lt('created_at', fourHoursAgo)
+      .or('is_archived.eq.false,is_archived.is.null')
       .order('created_at', { ascending: false })
       .range(from, to);
       

@@ -63,11 +63,42 @@ serve(async (req) => {
 
     console.log(`Executing ${signal.symbol} ${signal.side}. Calculated Volume: ${volume}`);
 
-    // Map Side to MetaApi OrderType
-    const actionType = signal.side === "LONG" ? "ORDER_TYPE_BUY" : "ORDER_TYPE_SELL";
+    // --- REAL-TIME SPREAD CHECK ---
+    const baseUrl = Deno.env.get("META_API_BASE_URL") || "https://mt-client-api-v1.new-york.agiliumtrade.ai";
+    try {
+      const quoteUrl = `${baseUrl}/users/current/accounts/${META_API_ACCOUNT_ID}/symbols/${signal.symbol}/current-quote`;
+      const quoteResponse = await fetch(quoteUrl, { headers: { "auth-token": META_API_TOKEN } });
+      
+      if (quoteResponse.ok) {
+        const quoteData = await quoteResponse.json();
+        const spread = Math.abs(quoteData.ask - quoteData.bid);
+        
+        // Dynamic Spread Threshold based on Asset magnitude
+        const maxSpreadRaw = (entryPrice && entryPrice > 1000) ? 0.50 : (entryPrice && entryPrice > 10 ? 0.05 : 0.0005);
+        
+        console.log(`[Spread Check] ${signal.symbol} | Bid: ${quoteData.bid} | Ask: ${quoteData.ask} | Spread: ${spread.toFixed(5)} | Max Allowed: ${maxSpreadRaw}`);
+        
+        if (spread > maxSpreadRaw) {
+          console.error(`[Execution Aborted] Spread of ${spread.toFixed(5)} exceeds safety threshold of ${maxSpreadRaw}. Broker may be widening spread due to news.`);
+          return new Response(JSON.stringify({ error: "Spread too high", spread }), { status: 406 });
+        }
+      }
+    } catch (e) {
+      console.warn("Spread check failed, proceeding cautiously:", e);
+    }
+
+    // --- MAP ORDER TYPE ---
+    let actionType = "ORDER_TYPE_BUY";
+    const aiOrderType = (signal.order_type || "Market").toUpperCase();
+    
+    if (aiOrderType.includes("BUY LIMIT")) actionType = "ORDER_TYPE_BUY_LIMIT";
+    else if (aiOrderType.includes("SELL LIMIT")) actionType = "ORDER_TYPE_SELL_LIMIT";
+    else if (aiOrderType.includes("BUY STOP")) actionType = "ORDER_TYPE_BUY_STOP";
+    else if (aiOrderType.includes("SELL STOP")) actionType = "ORDER_TYPE_SELL_STOP";
+    else actionType = signal.side === "LONG" ? "ORDER_TYPE_BUY" : "ORDER_TYPE_SELL";
 
     // MetaApi execute order payload
-    const orderPayload = {
+    const orderPayload: any = {
       actionType: actionType,
       symbol: signal.symbol,
       volume: volume,
@@ -75,7 +106,12 @@ serve(async (req) => {
       takeProfit: takeProfit,
     };
 
-    const metaApiUrl = `https://mt-client-api-v1.agiliumtrade.agiliumtrade.ai/users/current/accounts/${META_API_ACCOUNT_ID}/trade`;
+    // Inject openPrice for pending orders
+    if (actionType.includes("LIMIT") || actionType.includes("STOP")) {
+      orderPayload.openPrice = entryPrice;
+    }
+
+    const metaApiUrl = `${baseUrl}/users/current/accounts/${META_API_ACCOUNT_ID}/trade`;
 
     const response = await fetch(metaApiUrl, {
       method: "POST",
