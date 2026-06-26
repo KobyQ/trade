@@ -14,11 +14,11 @@ begin
   end if;
 
   payload := jsonb_build_object(
-    'type', 'INSERT',
+    'type', TG_OP,
     'table', TG_TABLE_NAME,
     'schema', TG_TABLE_SCHEMA,
     'record', row_to_json(NEW),
-    'old_record', null
+    'old_record', case when TG_OP = 'UPDATE' then row_to_json(OLD) else null end
   );
 
   -- Execute asynchronous HTTP POST via pg_net to the execution API
@@ -37,6 +37,5 @@ drop trigger if exists on_signal_execute on public.trade_opportunities;
 
 -- Create trigger
 create trigger on_signal_execute
-  after insert on public.trade_opportunities
-  for each row
-  execute function public.trigger_exness_executor();
+  after insert or update on public.trade_opportunities
+  for each row execute function public.trigger_exness_executor();
