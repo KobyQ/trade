@@ -52,14 +52,59 @@ serve(async (_req) => {
     })
     .neq('status', 'CLOSED');
   if (error) {
-    return new Response(
-      JSON.stringify({ ok: false, error: error.message }),
-      { status: 500, headers: { 'content-type': 'application/json' } },
-    );
+    console.error("Failed to update trades table:", error);
+  }
+
+  // --- MetaApi (Exness) Kill Switch ---
+  let metaApiOrdersCanceled = 0;
+  let metaApiPositionsClosed = 0;
+
+  const META_API_TOKEN = Deno.env.get("META_API_TOKEN");
+  const META_API_ACCOUNT_ID = Deno.env.get("META_API_ACCOUNT_ID");
+  const metaBaseUrl = Deno.env.get("META_API_BASE_URL") || "https://mt-client-api-v1.london.agiliumtrade.ai";
+
+  if (META_API_TOKEN && META_API_ACCOUNT_ID) {
+    try {
+      // 1. Cancel Pending Orders
+      const ordersUrl = `${metaBaseUrl}/users/current/accounts/${META_API_ACCOUNT_ID}/orders`;
+      const ordersRes = await fetch(ordersUrl, { headers: { "auth-token": META_API_TOKEN } });
+      if (ordersRes.ok) {
+        const orders = await ordersRes.json();
+        for (const order of orders) {
+          await fetch(`${metaBaseUrl}/users/current/accounts/${META_API_ACCOUNT_ID}/trade`, {
+            method: "POST",
+            headers: { "auth-token": META_API_TOKEN, "Content-Type": "application/json" },
+            body: JSON.stringify({ actionType: "ORDER_CANCEL", orderId: order.id })
+          });
+          metaApiOrdersCanceled++;
+        }
+      }
+
+      // 2. Close Open Positions
+      const posUrl = `${metaBaseUrl}/users/current/accounts/${META_API_ACCOUNT_ID}/positions`;
+      const posRes = await fetch(posUrl, { headers: { "auth-token": META_API_TOKEN } });
+      if (posRes.ok) {
+        const positions = await posRes.json();
+        for (const pos of positions) {
+          await fetch(`${metaBaseUrl}/users/current/accounts/${META_API_ACCOUNT_ID}/trade`, {
+            method: "POST",
+            headers: { "auth-token": META_API_TOKEN, "Content-Type": "application/json" },
+            body: JSON.stringify({ actionType: "POSITION_CLOSE_ID", positionId: pos.id })
+          });
+          metaApiPositionsClosed++;
+        }
+      }
+    } catch (err) {
+      console.error("[Kill Switch] MetaApi execution failed:", err);
+    }
   }
 
   return new Response(
-    JSON.stringify({ ok: true, ordersCanceled, positionsClosed }),
+    JSON.stringify({ 
+      ok: true, 
+      alpaca: { ordersCanceled, positionsClosed },
+      exness: { ordersCanceled: metaApiOrdersCanceled, positionsClosed: metaApiPositionsClosed }
+    }),
     { headers: { 'content-type': 'application/json' } },
   );
 });
