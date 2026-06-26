@@ -8,14 +8,21 @@ create extension if not exists pg_cron;
 select cron.schedule(
   'daily_research',
   '30 13 * * 1-5',
-  $$ select rpc_start_research('1d'); $$
+  $$ select net.http_post(url := 'http://kong:8000/functions/v1/research-run?timeframe=1D', headers := '{"Content-Type": "application/json"}'::jsonb); $$
 );
 
 -- Optional: run hourly research at the top of each hour
 select cron.schedule(
   'hourly_research',
   '0 * * * *',
-  $$ select rpc_start_research('1h'); $$
+  $$ select net.http_post(url := 'http://kong:8000/functions/v1/research-run?timeframe=1H', headers := '{"Content-Type": "application/json"}'::jsonb); $$
+);
+
+-- Trailing stop check on Exness via MetaApi every hour
+select cron.schedule(
+  'exness_monitor',
+  '0 * * * *',
+  $$ select net.http_post(url := 'http://kong:8000/functions/v1/exness-monitor', headers := '{"Content-Type": "application/json"}'::jsonb); $$
 );
 
 -- Monitor open trades during the regular session (14:30-21:00 GMT)
