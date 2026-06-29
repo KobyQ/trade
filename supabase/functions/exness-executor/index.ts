@@ -93,7 +93,55 @@ serve(async (req) => {
          continue;
       }
 
-      // 3. Execution
+      // 3. Spread Check
+      let spreadExceeded = false;
+      let spreadRejectReason = "";
+
+      if (user.is_live_execution_enabled && user.meta_api_token && user.meta_api_account_id) {
+        try {
+          const quoteUrl = `${baseUrl}/users/current/accounts/${user.meta_api_account_id}/symbols/${signal.symbol}/current-quote`;
+          const quoteRes = await fetch(quoteUrl, {
+             headers: { "auth-token": user.meta_api_token }
+          });
+          
+          if (quoteRes.ok) {
+             const quoteData = await quoteRes.json();
+             if (quoteData.ask && quoteData.bid) {
+                const diff = quoteData.ask - quoteData.bid;
+                const bidStr = quoteData.bid.toString();
+                const decimals = bidStr.includes('.') ? bidStr.split('.')[1].length : 0;
+                const multiplier = Math.pow(10, decimals);
+                const spreadPoints = Math.round(diff * multiplier);
+                
+                const maxPoints = Number(user.max_spread_points ?? 50);
+                
+                if (spreadPoints > maxPoints) {
+                   spreadExceeded = true;
+                   spreadRejectReason = `Spread exceeded tolerance (Current: ${spreadPoints} pts, Max: ${maxPoints} pts)`;
+                }
+             }
+          }
+        } catch (e) {
+          console.error(`[Router] Failed to fetch spread for ${user.user_id}: ${e}`);
+        }
+      }
+
+      if (spreadExceeded) {
+         console.log(`[Router] User ${user.user_id} rejected: ${spreadRejectReason}`);
+         await supabase.from("user_trades").insert({
+           user_id: user.user_id,
+           opportunity_id: signal.id,
+           symbol: signal.symbol,
+           side: signal.side,
+           volume: volume,
+           risk_amount: userRiskAmount,
+           status: "REJECTED",
+           error_message: spreadRejectReason
+         });
+         continue;
+      }
+
+      // 4. Execution
       let status = "PENDING";
       let error_message = null;
       let meta_api_order_id = null;
@@ -124,7 +172,19 @@ serve(async (req) => {
 
            if (!response.ok) {
              error_message = await response.text();
-             status = "FAILED";
+             const isMarketOrder = actionType === "ORDER_TYPE_BUY" || actionType === "ORDER_TYPE_SELL";
+             if (!isMarketOrder) {
+               await supabase.from("meta_api_retry_queue").insert({
+                 user_id: user.user_id,
+                 meta_api_account_id: user.meta_api_account_id,
+                 request_type: "ORDER_CREATE",
+                 api_payload: orderPayload,
+                 last_error: error_message
+               });
+               status = "RETRYING";
+             } else {
+               status = "FAILED";
+             }
            } else {
              const responseData = await response.json();
              meta_api_order_id = responseData.orderId || "EXECUTED";
@@ -132,7 +192,19 @@ serve(async (req) => {
            }
          } catch (e: any) {
            error_message = e.message;
-           status = "FAILED";
+           const isMarketOrder = actionType === "ORDER_TYPE_BUY" || actionType === "ORDER_TYPE_SELL";
+           if (!isMarketOrder) {
+             await supabase.from("meta_api_retry_queue").insert({
+               user_id: user.user_id,
+               meta_api_account_id: user.meta_api_account_id,
+               request_type: "ORDER_CREATE",
+               api_payload: orderPayload,
+               last_error: error_message
+             });
+             status = "RETRYING";
+           } else {
+             status = "FAILED";
+           }
          }
       } else {
          // Paper trading
