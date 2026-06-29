@@ -274,7 +274,7 @@ export default function LandingPage() {
           <a href="#" style={{ color: 'inherit', textDecoration: 'none' }}>Terms of Service</a>
         </div>
         <div style={{ color: '#4b5563', fontSize: '13px', marginTop: '24px' }}>
-          © {new Date().getFullYear()} RaineBank Intelligence. Built on institutional math.
+          © {new Date().getFullYear()} RaineBank. Developed by RaineSoft Solutions.
         </div>
       </footer>
     </div>
