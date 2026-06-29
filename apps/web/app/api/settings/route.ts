@@ -1,0 +1,63 @@
+import { NextResponse } from 'next/server';
+import { supabaseServer } from '@lib/supabase-server';
+
+export async function GET(request: Request) {
+  const supabase = supabaseServer();
+
+  const { data: { user } } = await supabase.auth.getUser();
+
+  if (!user) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  }
+
+  const { data: settings, error } = await supabase
+    .from('user_risk_settings')
+    .select('*')
+    .eq('user_id', user.id)
+    .single();
+
+  if (error && error.code !== 'PGRST116') {
+    return NextResponse.json({ error: error.message }, { status: 500 });
+  }
+
+  // If no settings exist yet (PGRST116), return an empty object,
+  // the frontend will fall back to its default state
+  return NextResponse.json({ settings: settings || {} });
+}
+
+export async function POST(request: Request) {
+  const supabase = supabaseServer();
+
+  const { data: { user } } = await supabase.auth.getUser();
+
+  if (!user) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  }
+
+  try {
+    const body = await request.json();
+    
+    // Validate bounds
+    const updates = {
+      user_id: user.id,
+      portfolio_capital: Math.max(0, Number(body.portfolio_capital || 0)),
+      risk_per_trade_pct: Math.min(0.2, Math.max(0.001, Number(body.risk_per_trade_pct || 0.01))),
+      max_portfolio_heat_pct: Math.min(1.0, Math.max(0.01, Number(body.max_portfolio_heat_pct || 0.10))),
+      meta_api_token: body.meta_api_token || null,
+      meta_api_account_id: body.meta_api_account_id || null,
+      is_live_execution_enabled: Boolean(body.is_live_execution_enabled)
+    };
+
+    const { data, error } = await supabase
+      .from('user_risk_settings')
+      .upsert(updates, { onConflict: 'user_id' })
+      .select()
+      .single();
+
+    if (error) throw error;
+
+    return NextResponse.json({ success: true, settings: data });
+  } catch (error: any) {
+    return NextResponse.json({ error: error.message }, { status: 500 });
+  }
+}

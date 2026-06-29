@@ -1,6 +1,7 @@
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
 
 :root {
+  /* Dark Theme (Default) */
   --bg-color: #0b0f19;
   --panel-bg: rgba(20, 25, 35, 0.6);
   --border-color: rgba(255, 255, 255, 0.08);
@@ -10,6 +11,25 @@
   --accent-hover: #60a5fa;
   --accent-glow: rgba(59, 130, 246, 0.5);
   --nav-hover: rgba(255, 255, 255, 0.05);
+  --bg-gradient-1: rgba(59, 130, 246, 0.08);
+  --bg-gradient-2: rgba(147, 51, 234, 0.08);
+  --input-bg: rgba(0, 0, 0, 0.2);
+}
+
+.theme-light {
+  /* Light Theme */
+  --bg-color: #f1f5f9;
+  --panel-bg: rgba(255, 255, 255, 0.7);
+  --border-color: rgba(0, 0, 0, 0.1);
+  --text-primary: #0f172a;
+  --text-secondary: #475569;
+  --accent: #2563eb;
+  --accent-hover: #3b82f6;
+  --accent-glow: rgba(37, 99, 235, 0.3);
+  --nav-hover: rgba(0, 0, 0, 0.05);
+  --bg-gradient-1: rgba(37, 99, 235, 0.04);
+  --bg-gradient-2: rgba(16, 185, 129, 0.04);
+  --input-bg: rgba(255, 255, 255, 0.8);
 }
 
 * {
@@ -22,10 +42,11 @@ body {
   background-color: var(--bg-color);
   color: var(--text-primary);
   background-image: 
-    radial-gradient(circle at 15% 50%, rgba(59, 130, 246, 0.08), transparent 25%),
-    radial-gradient(circle at 85% 30%, rgba(147, 51, 234, 0.08), transparent 25%);
+    radial-gradient(circle at 15% 50%, var(--bg-gradient-1), transparent 25%),
+    radial-gradient(circle at 85% 30%, var(--bg-gradient-2), transparent 25%);
   background-attachment: fixed;
   min-height: 100vh;
+  transition: background-color 0.3s ease, color 0.3s ease;
 }
 
 .layout-container {

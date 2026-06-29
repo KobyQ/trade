@@ -1,97 +1,102 @@
 import React from 'react';
 import Logo from '@components/Logo';
 import Link from 'next/link';
+import { ArrowLeft } from 'lucide-react';
 
 export const metadata = {
-  title: 'API Documentation | RaineBank',
-  description: 'Integration guide for the RaineBank Institutional Alpha feed.',
+  title: 'API Documentation | AI Trading',
+  description: 'Integration guide for the Institutional Alpha feed.',
 };
 
 export default function ApiDocs() {
   return (
-    <div className="min-h-screen bg-black text-gray-200 py-20 px-6 sm:px-12 font-sans selection:bg-green-500/30">
-      <div className="max-w-4xl mx-auto space-y-16">
+    <div style={{ padding: '40px 24px', maxWidth: '900px', margin: '0 auto', minHeight: '100vh' }}>
+      <div className="page-content" style={{ display: 'flex', flexDirection: 'column', gap: '48px' }}>
         
         {/* Navigation */}
-        <nav className="flex justify-between items-center pb-8 border-b border-gray-800">
-          <Link href="/">
+        <nav style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingBottom: '24px', borderBottom: '1px solid var(--border-color)' }}>
+          <Link href="/" style={{ textDecoration: 'none' }}>
             <Logo />
           </Link>
-          <Link href="/dashboard" className="text-gray-400 hover:text-white transition-colors text-sm font-medium">
+          <Link href="/dashboard" style={{ color: 'var(--text-secondary)', textDecoration: 'none', fontSize: '14px', fontWeight: 500, display: 'flex', alignItems: 'center', gap: '6px' }}>
+            <ArrowLeft size={16} />
             Back to Vault
           </Link>
         </nav>
 
         {/* Header */}
-        <header className="space-y-4">
-          <h1 className="text-4xl md:text-5xl font-bold text-white tracking-tight">
+        <header style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+          <h1 style={{ fontSize: '36px', fontWeight: 700, margin: 0, color: 'var(--text-primary)' }}>
             Institutional API
           </h1>
-          <p className="text-lg text-gray-400">
-            Programmatic access to the RaineBank Alpha Engine. Consume mathematically verified, AI-evaluated trade setups in real-time.
+          <p style={{ fontSize: '18px', color: 'var(--text-secondary)', margin: 0, lineHeight: 1.6 }}>
+            Programmatic access to the Alpha Engine. Consume mathematically verified, AI-evaluated trade setups in real-time.
           </p>
         </header>
 
         {/* Authentication Section */}
-        <section className="space-y-6">
-          <h2 className="text-2xl font-semibold text-white border-b border-gray-800 pb-2">Authentication</h2>
-          <p className="text-gray-400">
-            All requests to the RaineBank API must be authenticated via a Bearer token in the <code className="bg-gray-900 text-green-400 px-1.5 py-0.5 rounded">Authorization</code> header. Keys are provisioned securely via our Unkey edge network.
+        <section style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+          <h2 style={{ fontSize: '24px', fontWeight: 600, color: 'var(--text-primary)', borderBottom: '1px solid var(--border-color)', paddingBottom: '12px', margin: 0 }}>Authentication</h2>
+          <p style={{ color: 'var(--text-secondary)', margin: 0, lineHeight: 1.6 }}>
+            All requests to the API must be authenticated via a Bearer token in the <code style={{ background: 'var(--input-bg)', color: 'var(--accent)', padding: '2px 6px', borderRadius: '4px', fontSize: '14px' }}>Authorization</code> header. Keys are provisioned securely via our Unkey edge network.
           </p>
-          <div className="bg-gray-900 border border-gray-800 rounded-lg p-4 font-mono text-sm overflow-x-auto text-gray-300 shadow-xl">
-            GET /api/v1/signals HTTP/1.1<br/>
-            Host: rainebank.com<br/>
-            Authorization: Bearer rb_live_xxxxxxxxxxxxxxxxx
+          <div style={{ background: '#0d1117', border: '1px solid #30363d', borderRadius: '8px', padding: '16px', fontFamily: 'monospace', fontSize: '14px', color: '#c9d1d9', overflowX: 'auto', boxShadow: '0 4px 12px rgba(0,0,0,0.2)' }}>
+            <span style={{ color: '#ff7b72' }}>GET</span> /api/vault/signals HTTP/1.1<br/>
+            <span style={{ color: '#79c0ff' }}>Host:</span> api.aitrading.com<br/>
+            <span style={{ color: '#79c0ff' }}>Authorization:</span> Bearer live_xxxxxxxxxxxxxxxxx
           </div>
         </section>
 
         {/* Endpoint: Get Signals */}
-        <section className="space-y-6">
-          <h2 className="text-2xl font-semibold text-white border-b border-gray-800 pb-2">Retrieve Signals</h2>
-          <div className="flex items-center space-x-3">
-            <span className="bg-green-500/10 text-green-400 px-3 py-1 rounded-full text-xs font-bold tracking-wider">GET</span>
-            <code className="text-gray-300 font-mono">/api/v1/signals</code>
+        <section style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+          <h2 style={{ fontSize: '24px', fontWeight: 600, color: 'var(--text-primary)', borderBottom: '1px solid var(--border-color)', paddingBottom: '12px', margin: 0 }}>Retrieve Signals</h2>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+            <span style={{ background: 'rgba(16, 185, 129, 0.15)', color: '#10b981', padding: '4px 12px', borderRadius: '16px', fontSize: '12px', fontWeight: 700, letterSpacing: '1px' }}>GET</span>
+            <code style={{ color: 'var(--text-primary)', fontFamily: 'monospace', fontSize: '16px' }}>/api/vault/signals</code>
           </div>
-          <p className="text-gray-400">Fetches the latest evaluated trade opportunities. The feed is ordered chronologically by execution timestamp.</p>
+          <p style={{ color: 'var(--text-secondary)', margin: 0, lineHeight: 1.6 }}>Fetches the latest evaluated trade opportunities. The feed is ordered chronologically by execution timestamp. Free tier users experience a 4-hour delay and receive masked metrics.</p>
           
-          <h3 className="text-lg font-medium text-white pt-4">Query Parameters</h3>
-          <ul className="space-y-3">
-            <li className="flex items-start">
-              <code className="text-blue-400 w-24 flex-shrink-0">symbol</code>
-              <span className="text-gray-400 text-sm"><span className="text-gray-500 italic">(Optional)</span> Filter by specific asset. Valid values: <code className="text-gray-300">XAUUSD</code>, <code className="text-gray-300">BTCUSD</code>.</span>
+          <h3 style={{ fontSize: '18px', fontWeight: 500, color: 'var(--text-primary)', marginTop: '16px', margin: 0 }}>Query Parameters</h3>
+          <ul style={{ display: 'flex', flexDirection: 'column', gap: '16px', listStyle: 'none', padding: 0, margin: 0 }}>
+            <li style={{ display: 'flex', alignItems: 'flex-start', gap: '16px' }}>
+              <code style={{ color: 'var(--accent)', minWidth: '80px', fontFamily: 'monospace', fontSize: '14px' }}>page</code>
+              <span style={{ color: 'var(--text-secondary)', fontSize: '14px', lineHeight: 1.6 }}><span style={{ color: 'var(--text-secondary)', fontStyle: 'italic', opacity: 0.7 }}>(Optional)</span> Pagination page number. Default is 1.</span>
             </li>
-            <li className="flex items-start">
-              <code className="text-blue-400 w-24 flex-shrink-0">limit</code>
-              <span className="text-gray-400 text-sm"><span className="text-gray-500 italic">(Optional)</span> Number of records to return. Default is 50. Maximum is 100.</span>
+            <li style={{ display: 'flex', alignItems: 'flex-start', gap: '16px' }}>
+              <code style={{ color: 'var(--accent)', minWidth: '80px', fontFamily: 'monospace', fontSize: '14px' }}>limit</code>
+              <span style={{ color: 'var(--text-secondary)', fontSize: '14px', lineHeight: 1.6 }}><span style={{ color: 'var(--text-secondary)', fontStyle: 'italic', opacity: 0.7 }}>(Optional)</span> Number of records to return. Default is 10.</span>
             </li>
           </ul>
 
-          <h3 className="text-lg font-medium text-white pt-4">Response Payload</h3>
-          <div className="bg-[#0d0d0d] border border-gray-800 rounded-lg p-4 font-mono text-sm overflow-x-auto text-green-400 shadow-xl">
-            <pre>
+          <h3 style={{ fontSize: '18px', fontWeight: 500, color: 'var(--text-primary)', marginTop: '16px', margin: 0 }}>Response Payload (Pro Tier)</h3>
+          <div style={{ background: '#0d1117', border: '1px solid #30363d', borderRadius: '8px', padding: '16px', fontFamily: 'monospace', fontSize: '14px', color: '#a5d6ff', overflowX: 'auto', boxShadow: '0 4px 12px rgba(0,0,0,0.2)' }}>
+            <pre style={{ margin: 0, whiteSpace: 'pre-wrap' }}>
 {`{
-  "data": [
+  "signals": [
     {
       "id": "a1b2c3d4-...",
       "symbol": "XAUUSD",
-      "bias": "bullish",
-      "entry_price": 2342.50,
-      "stop_loss": 2338.00,
-      "take_profit": 2351.50,
-      "status": "active",
-      "r_multiple": null,
-      "institutional_rationale": "Price has swept the previous session liquidity pool. M30 structural alignment is bullish with price > EMA 50 > EMA 200. RSI indicates momentum buildup without overextension. 1:2 RR mandated.",
-      "logic_context": {
-        "ema_50": 2335.10,
-        "ema_200": 2310.45,
-        "rsi_14": 58.4
+      "side": "LONG",
+      "timeframe": "1H",
+      "status": "APPROVED",
+      "entry_plan_json": {
+        "price": 2342.50
       },
+      "stop_plan_json": {
+        "stop": 2338.00
+      },
+      "take_profit_json": {
+        "tp": 2351.50
+      },
+      "ai_summary": "Price has swept the previous session liquidity pool. M30 structural alignment is bullish with price > EMA 50 > EMA 200. RSI indicates momentum buildup without overextension. 1:2 RR mandated.",
       "created_at": "2026-06-15T14:30:00Z"
     }
   ],
-  "meta": {
-    "count": 1,
-    "timestamp": "2026-06-15T14:31:12Z"
+  "is_pro": true,
+  "pagination": {
+    "total": 1,
+    "page": 1,
+    "limit": 10
   }
 }`}
             </pre>
@@ -99,11 +104,11 @@ export default function ApiDocs() {
         </section>
 
         {/* Rate Limiting */}
-        <section className="space-y-6">
-          <h2 className="text-2xl font-semibold text-white border-b border-gray-800 pb-2">Rate Limits & Edge Security</h2>
-          <p className="text-gray-400">
+        <section style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+          <h2 style={{ fontSize: '24px', fontWeight: 600, color: 'var(--text-primary)', borderBottom: '1px solid var(--border-color)', paddingBottom: '12px', margin: 0 }}>Rate Limits & Edge Security</h2>
+          <p style={{ color: 'var(--text-secondary)', margin: 0, lineHeight: 1.6 }}>
             API endpoints are protected by global edge rate-limiting to ensure feed stability. 
-            The standard tier allows for <strong className="text-white">60 requests per minute</strong> per API key. Exceeding this limit will result in a <code className="bg-gray-900 text-red-400 px-1.5 py-0.5 rounded">429 Too Many Requests</code> response.
+            The standard tier allows for <strong style={{ color: 'var(--text-primary)' }}>60 requests per minute</strong> per API key. Exceeding this limit will result in a <code style={{ background: 'rgba(239, 68, 68, 0.1)', color: '#ef4444', padding: '2px 6px', borderRadius: '4px', fontSize: '14px' }}>429 Too Many Requests</code> response.
           </p>
         </section>
 
