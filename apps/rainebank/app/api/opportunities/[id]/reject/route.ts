@@ -3,7 +3,10 @@ import { supabase } from '@lib/supabase';
 import { insertAuditLog } from '@core/audit';
 
 export async function POST(req: NextRequest, { params }: { params: { id: string } }) {
-  const client = supabase;
+  const supabaseUrl = process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL!;
+  const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
+  const { createClient } = require('@supabase/supabase-js');
+  const client = createClient(supabaseUrl, supabaseKey);
   const body = await req.json().catch(() => ({}));
   const reason: string | undefined = body.reason;
 
