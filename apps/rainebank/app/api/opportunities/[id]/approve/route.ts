@@ -1,3 +1,4 @@
+import { createClient } from '@supabase/supabase-js';
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseServer } from '@lib/supabase-server';
 import { placeAndTrackOrder } from '@execution/index';
@@ -8,7 +9,6 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
   const idKey = req.headers.get('Idempotency-Key');
   const supabaseUrl = process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL!;
   const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
-  const { createClient } = require('@supabase/supabase-js');
   const client = createClient(supabaseUrl, supabaseKey);
 
   if (idKey) {
