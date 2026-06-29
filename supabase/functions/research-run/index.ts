@@ -55,7 +55,7 @@ async function saveBars(
   }
 }
 
-async function evaluateOpportunity(symbol: string, snapshot: LogicContext, timeframe: string) {
+async function evaluateOpportunity(symbol: string, snapshot: LogicContext, timeframe: string, historicalMemory: string) {
   const openaiKey = Deno.env.get("OPENAI_API_KEY");
   const azureKey = Deno.env.get("AZURE_OPENAI_API_KEY");
   
@@ -74,6 +74,10 @@ async function evaluateOpportunity(symbol: string, snapshot: LogicContext, timef
   }
 
   const systemPrompt = `You are a Senior Risk Officer for an institutional trading desk. You respond EXCLUSIVELY in raw JSON.
+
+[HISTORICAL PERFORMANCE CALIBRATION]
+Review your past decisions on this asset to calibrate your current bias. If you notice a recent losing streak or repeated rejections for the same structural reason, you MUST act defensively and adjust your confidence and action thresholds.
+${historicalMemory || "No historical data available for this asset yet."}
 
 [CRITICAL OUTPUT RULE]
 You MUST respond strictly with a raw JSON object matching the exact schema below. Do not include any markdown formatting (like \`\`\`json), wrapper text, HTML tags, or conversational preambles. If you include anything other than raw JSON, the system breaks.
@@ -325,12 +329,30 @@ serve((req) => {
               continue;
             }
 
+            // --- AI MEMORY CALIBRATION ---
+            console.log(`[Data Fetch] Querying historical ledger for ${symbol}...`);
+            sendEvent({ type: 'progress', message: `[AI Memory] Pulling last 5 trades to calibrate bias for ${symbol}...` });
+            const { data: pastTrades } = await supabase
+              .from("trade_opportunities")
+              .select("status, side, ai_summary, r_multiple")
+              .eq("symbol", symbol)
+              .in("status", ["WON", "LOST", "REJECTED"])
+              .order("created_at", { ascending: false })
+              .limit(5);
+
+            let historicalMemory = "";
+            if (pastTrades && pastTrades.length > 0) {
+              historicalMemory = pastTrades.map((t, i) => 
+                `Past Decision ${i+1} (${t.side} -> ${t.status}, ${t.r_multiple !== null ? t.r_multiple + 'R' : 'N/A'}): "${t.ai_summary || 'No rationale logged'}"`
+              ).join("\n");
+            }
+
             // LAYER B: Cognitive Guard (Senior Risk Officer)
             let evaluation;
             try {
               console.log(`[Layer B: Cognitive Guard] Requesting AI evaluation for ${symbol}...`);
               sendEvent({ type: 'progress', message: `[Layer B: AI Risk Officer] Evaluating institutional rationale and key levels for ${snapshot.trend_alignment} setup...` });
-              evaluation = await evaluateOpportunity(symbol, snapshot, timeframe);
+              evaluation = await evaluateOpportunity(symbol, snapshot, timeframe, historicalMemory);
             } catch (err: any) {
               console.error(`[Layer B Error] AI evaluation failed for ${symbol}: ${err.message}`);
               sendEvent({ type: 'progress', message: `[Layer B: AI Risk Officer] Evaluation failed: ${err.message}` });
