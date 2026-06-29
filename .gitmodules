@@ -1,0 +1,3 @@
+[submodule "apps/kobyq"]
+	path = apps/kobyq
+	url = https://github.com/KobyQ/KobyQ.git
