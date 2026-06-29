@@ -1,5 +1,5 @@
 create table public.user_subscriptions (
-    id uuid primary key default uuid_generate_v4(),
+    id uuid primary key default gen_random_uuid(),
     user_id uuid references auth.users(id) on delete cascade not null,
     paystack_customer_code text,
     paystack_subscription_code text,

@@ -8,6 +8,13 @@ services:
     ports:
       - "3000:3000"
     env_file:
-      - apps/web/.env.local
+      - apps/rainebank/.env.local
     restart: unless-stopped
 
+  rainesoft:
+    build:
+      context: .
+      dockerfile: Dockerfile.rainesoft
+    ports:
+      - "3001:3001"
+    restart: unless-stopped
