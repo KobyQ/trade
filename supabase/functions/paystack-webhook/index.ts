@@ -86,7 +86,7 @@ serve(async (req) => {
       const { error: updateError } = await supabase
         .from('user_subscriptions')
         .update({
-          plan_tier: 'alpha',
+          plan_tier: 'pro',
           paystack_customer_code: customerCode,
           paystack_subscription_code: subscriptionCode,
           status: 'active',
@@ -99,7 +99,40 @@ serve(async (req) => {
         throw updateError;
       }
 
-      console.log(`Successfully upgraded user ${user.id} to alpha tier.`);
+      // 3. Auto-unlock Live Execution!
+      const { error: riskError } = await supabase
+        .from('user_risk_settings')
+        .update({
+          is_live_execution_enabled: true
+        })
+        .eq('user_id', user.id);
+
+      if (riskError) {
+        console.error('Failed to update user_risk_settings', riskError);
+      }
+
+      console.log(`Successfully upgraded user ${user.id} to pro tier and unlocked live execution.`);
+    } else if (event.event === 'subscription.disable' || event.event === 'charge.failed') {
+      const email = event.data.customer.email;
+      console.log(`Processing subscription cancellation for: ${email}`);
+      
+      const { data: users, error: userError } = await supabase.auth.admin.listUsers();
+      if (userError || !users.users) throw new Error(`Failed to list users: ${userError?.message}`);
+      
+      const user = users.users.find((u: any) => u.email === email);
+      if (user) {
+        await supabase.from('user_subscriptions').update({
+          plan_tier: 'free',
+          status: 'canceled',
+          updated_at: new Date().toISOString()
+        }).eq('user_id', user.id);
+
+        await supabase.from('user_risk_settings').update({
+          is_live_execution_enabled: false
+        }).eq('user_id', user.id);
+
+        console.log(`Successfully downgraded user ${user.id} to free tier and locked live execution.`);
+      }
     }
 
     // You can handle other events here (e.g. subscription.disable, invoice.payment_failed)
