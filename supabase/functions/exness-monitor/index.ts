@@ -1,21 +1,10 @@
 import { serve } from "https://deno.land/std@0.177.0/http/server.ts";
 import { createClient } from "npm:@supabase/supabase-js@2.108.2";
+import { isMarketOpen } from "../_shared/market.ts";
 
 const baseUrl = Deno.env.get("META_API_BASE_URL") || "https://mt-client-api-v1.london.agiliumtrade.ai";
 
 serve(async (req) => {
-  // Skip execution when the market is closed (Friday 22:00 UTC to Sunday 22:00 UTC)
-  const now = new Date();
-  const day = now.getUTCDay();
-  const hour = now.getUTCHours();
-  const isWeekend = (day === 5 && hour >= 22) || (day === 6) || (day === 0 && hour < 22);
-  
-  if (req.method === "POST" && isWeekend) {
-    return new Response(
-      JSON.stringify({ ok: true, skipped: true, reason: "Market is closed (Weekend)" }),
-      { status: 200, headers: { "content-type": "application/json" } }
-    );
-  }
 
   try {
     const supabaseUrl = Deno.env.get('SUPABASE_URL');
@@ -72,6 +61,11 @@ serve(async (req) => {
 
       for (const pos of positions) {
         const { id, type, symbol, openPrice, currentPrice, stopLoss, takeProfit, time } = pos;
+        
+        if (!isMarketOpen(symbol)) {
+          console.log(`[Exness Monitor] Skipping ${symbol} (${id}): Market is closed.`);
+          continue;
+        }
 
         // --- 1. Dynamic Trade Termination (Thesis Validation) ---
         console.log(`[Exness Monitor] Validating thesis for open trade ${symbol} (${id})...`);

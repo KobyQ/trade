@@ -3,6 +3,7 @@ import { createClient, SupabaseClient } from "npm:@supabase/supabase-js@2.108.2"
 import { fetchPaperBars, Bar } from "../_shared/execution.ts";
 import { sma, rsi, detectRegime } from "../_shared/strategy.ts";
 import { insertAuditLog } from "../_shared/audit.ts";
+import { isMarketOpen } from "../_shared/market.ts";
 import { netEdge, transactionCost, slippage } from "../../../packages/strategy/index.ts";
 import { getContextSnapshot, LogicContext } from "../../../packages/strategy/indicators.ts";
 import { validateGlobalSignal } from "../../../packages/strategy/riskManager.ts";
@@ -216,20 +217,6 @@ Current Market Context:
 serve((req) => {
   const { searchParams } = new URL(req.url);
   const isCron = req.method === "POST";
-  
-  // Skip execution when the market is closed (Friday 22:00 UTC to Sunday 22:00 UTC)
-  const now = new Date();
-  const day = now.getUTCDay();
-  const hour = now.getUTCHours();
-  const isWeekend = (day === 5 && hour >= 22) || (day === 6) || (day === 0 && hour < 22);
-  
-  if (isCron && isWeekend) {
-    return new Response(
-      JSON.stringify({ ok: true, skipped: true, reason: "Market is closed (Weekend)" }),
-      { status: 200, headers: { "content-type": "application/json" } }
-    );
-  }
-
   const timeframe = searchParams.get("timeframe") ?? (isCron ? "1H" : "1D");
   const modelId = searchParams.get("model_id") ?? undefined;
   const modelVersion = searchParams.get("model_version") ?? undefined;
@@ -271,6 +258,11 @@ serve((req) => {
         sendEvent({ type: 'progress', message: `Starting analysis pipeline for: ${symbols.join(", ")}` });
         
         for (const symbol of symbols) {
+          if (isCron && !isMarketOpen(symbol)) {
+            console.log(`[Market Hours] Skipping ${symbol}: Market is closed.`);
+            sendEvent({ type: 'progress', message: `[Market Hours] Skipping ${symbol}: Market is closed.` });
+            continue;
+          }
           try {
             await insertAuditLog(supabase, {
               actor_type: "SYSTEM",
