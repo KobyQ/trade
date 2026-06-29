@@ -15,6 +15,7 @@ export default function SettingsPage() {
     portfolio_capital: 10000,
     risk_per_trade_pct: 0.01,
     max_portfolio_heat_pct: 0.10,
+    max_spread_points: 50,
     meta_api_token: '',
     meta_api_account_id: '',
     is_live_execution_enabled: false
@@ -29,6 +30,7 @@ export default function SettingsPage() {
             portfolio_capital: data.settings.portfolio_capital || 10000,
             risk_per_trade_pct: data.settings.risk_per_trade_pct || 0.01,
             max_portfolio_heat_pct: data.settings.max_portfolio_heat_pct || 0.10,
+            max_spread_points: data.settings.max_spread_points || 50,
             meta_api_token: data.settings.meta_api_token || '',
             meta_api_account_id: data.settings.meta_api_account_id || '',
             is_live_execution_enabled: data.settings.is_live_execution_enabled || false
@@ -122,6 +124,10 @@ export default function SettingsPage() {
             <div>
               <label style={{ display: 'block', fontSize: '14px', color: 'var(--text-secondary)', marginBottom: '8px' }}>Global Portfolio Heat Cap (%) - {Number(settings.max_portfolio_heat_pct) * 100}%</label>
               <input type="number" step="0.01" name="max_portfolio_heat_pct" value={settings.max_portfolio_heat_pct} onChange={handleChange} style={{ width: '100%', padding: '12px', borderRadius: '8px', background: 'transparent', border: '1px solid var(--border-color)', color: 'var(--text-primary)' }} />
+            </div>
+            <div>
+              <label style={{ display: 'block', fontSize: '14px', color: 'var(--text-secondary)', marginBottom: '8px' }}>Max Spread Tolerance (Points)</label>
+              <input type="number" step="1" name="max_spread_points" value={settings.max_spread_points} onChange={handleChange} style={{ width: '100%', padding: '12px', borderRadius: '8px', background: 'transparent', border: '1px solid var(--border-color)', color: 'var(--text-primary)' }} />
             </div>
           </div>
         </div>
