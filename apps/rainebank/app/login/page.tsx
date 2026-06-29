@@ -14,11 +14,13 @@ export default function LoginPage() {
   const [isLogin, setIsLogin] = useState(true);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [success, setSuccess] = useState('');
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
     setError('');
+    setSuccess('');
 
     try {
       if (isLogin) {
@@ -38,7 +40,7 @@ export default function LoginPage() {
           },
         });
         if (signUpError) throw signUpError;
-        setError('Check your email to confirm your account, or login directly.');
+        setSuccess('Check your email to confirm your account, or login directly.');
         setIsLogin(true);
       }
     } catch (err: any) {
@@ -149,6 +151,22 @@ export default function LoginPage() {
               }}
             >
               {error}
+            </div>
+          )}
+
+          {success && (
+            <div
+              style={{
+                padding: '12px 16px',
+                backgroundColor: 'rgba(34, 197, 94, 0.1)',
+                borderLeft: '4px solid #22c55e',
+                borderRadius: '8px',
+                marginBottom: '24px',
+                fontSize: '14px',
+                color: '#86efac',
+              }}
+            >
+              {success}
             </div>
           )}
 
@@ -273,6 +291,7 @@ export default function LoginPage() {
               onClick={() => {
                 setIsLogin(!isLogin);
                 setError('');
+                setSuccess('');
               }}
               style={{
                 background: 'none',
