@@ -1,5 +1,6 @@
 import Link from 'next/link';
 import Logo from '@components/Logo';
+import LandingNavbar from '@components/LandingNavbar';
 
 export default function ComparePage() {
   return (
@@ -19,29 +20,7 @@ export default function ComparePage() {
       }} />
 
       {/* Floating Inset Navigation */}
-      <div style={{ padding: '24px', display: 'flex', justifyContent: 'center' }}>
-        <nav style={{
-          display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-          background: 'rgba(20, 20, 20, 0.6)', backdropFilter: 'blur(16px)',
-          border: '1px solid rgba(255,255,255,0.05)', borderRadius: '100px',
-          padding: '12px 32px', width: '100%', maxWidth: '1200px',
-          boxShadow: '0 8px 32px rgba(0,0,0,0.4)'
-        }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '48px' }}>
-            <Logo />
-            <div style={{ display: 'flex', gap: '24px', alignItems: 'center', color: '#fff', fontSize: '14px', fontWeight: 600 }}>
-              <Link href="/" style={{ color: 'inherit', textDecoration: 'none', transition: 'opacity 0.2s', ':hover': { opacity: 0.8 } } as any}>Home</Link>
-            </div>
-          </div>
-          <div style={{ display: 'flex', gap: '16px', alignItems: 'center' }}>
-            <Link href="/login" style={{ color: '#fff', textDecoration: 'none', fontSize: 14, fontWeight: 600 }}>Log in</Link>
-            <Link href="/dashboard" style={{
-              background: '#fff', color: '#000', padding: '10px 24px', borderRadius: '100px',
-              textDecoration: 'none', fontSize: 14, fontWeight: 600, transition: 'opacity 0.2s'
-            }}>Get Started</Link>
-          </div>
-        </nav>
-      </div>
+      <LandingNavbar />
 
       <main style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '64px 24px' }}>
         

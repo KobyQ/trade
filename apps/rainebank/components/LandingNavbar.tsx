@@ -1,0 +1,96 @@
+"use client";
+
+import React, { useState } from 'react';
+import Link from 'next/link';
+import { usePathname } from 'next/navigation';
+import Logo from './Logo';
+import { Menu, X } from 'lucide-react';
+
+export default function LandingNavbar() {
+  const [isOpen, setIsOpen] = useState(false);
+  const pathname = usePathname();
+
+  const isComparePage = pathname === '/compare';
+
+  return (
+    <>
+      <style>{`
+        .desktop-nav { display: none !important; }
+        .mobile-nav { display: flex !important; }
+        
+        @media (min-width: 768px) {
+          .desktop-nav { display: flex !important; }
+          .mobile-nav { display: none !important; }
+        }
+      `}</style>
+      
+      <div style={{ padding: '16px', display: 'flex', justifyContent: 'center', position: 'relative', zIndex: 50 }}>
+        <nav style={{
+          display: 'flex', flexDirection: 'column', width: '100%', maxWidth: '1200px',
+          background: 'rgba(20, 20, 20, 0.6)', backdropFilter: 'blur(16px)',
+          border: '1px solid rgba(255,255,255,0.05)', borderRadius: isOpen ? '24px' : '100px',
+          padding: '12px 32px', boxShadow: '0 8px 32px rgba(0,0,0,0.4)',
+          transition: 'border-radius 0.2s ease, background 0.2s ease'
+        }}>
+          {/* Top Bar */}
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '48px' }}>
+              <Link href="/" style={{ textDecoration: 'none' }}><Logo /></Link>
+              
+              {/* Desktop Links */}
+              <div className="desktop-nav" style={{ gap: '24px', alignItems: 'center', color: '#fff', fontSize: '14px', fontWeight: 600 }}>
+                {isComparePage ? (
+                  <Link href="/" style={{ color: 'inherit', textDecoration: 'none', transition: 'opacity 0.2s', ':hover': { opacity: 0.8 } } as any}>Home</Link>
+                ) : (
+                  <>
+                    <Link href="#how-it-works" style={{ color: 'inherit', textDecoration: 'none', transition: 'opacity 0.2s', ':hover': { opacity: 0.8 } } as any}>How it Works</Link>
+                    <Link href="/compare" style={{ color: 'inherit', textDecoration: 'none', transition: 'opacity 0.2s', ':hover': { opacity: 0.8 } } as any}>How we compare</Link>
+                    <Link href="#pricing" style={{ color: 'inherit', textDecoration: 'none', transition: 'opacity 0.2s', ':hover': { opacity: 0.8 } } as any}>Pricing</Link>
+                    <Link href="/docs" style={{ color: 'inherit', textDecoration: 'none', transition: 'opacity 0.2s', ':hover': { opacity: 0.8 } } as any}>API Docs</Link>
+                  </>
+                )}
+              </div>
+            </div>
+
+            {/* Desktop Actions */}
+            <div className="desktop-nav" style={{ gap: '16px', alignItems: 'center' }}>
+              <Link href="/login" style={{ color: '#fff', textDecoration: 'none', fontSize: 14, fontWeight: 600 }}>Log in</Link>
+              <Link href="/dashboard" style={{
+                background: '#fff', color: '#000', padding: '10px 24px', borderRadius: '100px',
+                textDecoration: 'none', fontSize: 14, fontWeight: 600, transition: 'opacity 0.2s'
+              }}>Get Started</Link>
+            </div>
+
+            {/* Mobile Toggle Button */}
+            <div className="mobile-nav" style={{ alignItems: 'center' }}>
+              <button onClick={() => setIsOpen(!isOpen)} style={{ background: 'transparent', border: 'none', color: '#fff', cursor: 'pointer', padding: '4px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                {isOpen ? <X size={24} /> : <Menu size={24} />}
+              </button>
+            </div>
+          </div>
+
+          {/* Mobile Dropdown Menu */}
+          {isOpen && (
+            <div className="mobile-nav" style={{ flexDirection: 'column', gap: '20px', marginTop: '24px', paddingBottom: '16px', borderTop: '1px solid rgba(255,255,255,0.05)', paddingTop: '24px' }}>
+              {isComparePage ? (
+                <Link onClick={() => setIsOpen(false)} href="/" style={{ color: '#fff', textDecoration: 'none', fontSize: '16px', fontWeight: 600 }}>Home</Link>
+              ) : (
+                <>
+                  <Link onClick={() => setIsOpen(false)} href="#how-it-works" style={{ color: '#fff', textDecoration: 'none', fontSize: '16px', fontWeight: 600 }}>How it Works</Link>
+                  <Link onClick={() => setIsOpen(false)} href="/compare" style={{ color: '#fff', textDecoration: 'none', fontSize: '16px', fontWeight: 600 }}>How we compare</Link>
+                  <Link onClick={() => setIsOpen(false)} href="#pricing" style={{ color: '#fff', textDecoration: 'none', fontSize: '16px', fontWeight: 600 }}>Pricing</Link>
+                  <Link onClick={() => setIsOpen(false)} href="/docs" style={{ color: '#fff', textDecoration: 'none', fontSize: '16px', fontWeight: 600 }}>API Docs</Link>
+                </>
+              )}
+              
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', marginTop: '16px', paddingTop: '16px', borderTop: '1px solid rgba(255,255,255,0.05)' }}>
+                <Link onClick={() => setIsOpen(false)} href="/login" style={{ color: '#fff', textDecoration: 'none', fontSize: 16, fontWeight: 600, textAlign: 'center', padding: '12px', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.1)' }}>Log in</Link>
+                <Link onClick={() => setIsOpen(false)} href="/dashboard" style={{ background: '#fff', color: '#000', padding: '12px', borderRadius: '100px', textDecoration: 'none', fontSize: 16, fontWeight: 600, textAlign: 'center' }}>Get Started</Link>
+              </div>
+            </div>
+          )}
+        </nav>
+      </div>
+    </>
+  );
+}
