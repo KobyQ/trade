@@ -29,8 +29,8 @@ export default function ComparePage() {
         }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '48px' }}>
             <Logo />
-            <div style={{ display: 'flex', gap: '24px', alignItems: 'center', color: '#9ca3af', fontSize: '14px', fontWeight: 500 }}>
-              <Link href="/" style={{ color: '#fff', textDecoration: 'none', transition: 'color 0.2s' }}>Home</Link>
+            <div style={{ display: 'flex', gap: '24px', alignItems: 'center', color: '#fff', fontSize: '14px', fontWeight: 600 }}>
+              <Link href="/" style={{ color: 'inherit', textDecoration: 'none', transition: 'opacity 0.2s', ':hover': { opacity: 0.8 } } as any}>Home</Link>
             </div>
           </div>
           <div style={{ display: 'flex', gap: '16px', alignItems: 'center' }}>

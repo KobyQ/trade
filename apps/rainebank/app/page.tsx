@@ -51,7 +51,7 @@ export default async function LandingPage() {
         }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '48px' }}>
             <Logo />
-            <div style={{ gap: '24px', alignItems: 'center', color: '#fff', fontSize: '14px', fontWeight: 600 }} className="hidden md:flex">
+            <div style={{ display: 'flex', gap: '24px', alignItems: 'center', color: '#fff', fontSize: '14px', fontWeight: 600 }} className="hidden md:flex">
               <span style={{ cursor: 'pointer', transition: 'opacity 0.2s', ':hover': { opacity: 0.8 } } as any}>How it Works</span>
               <Link href="/compare" style={{ color: 'inherit', textDecoration: 'none', transition: 'opacity 0.2s', ':hover': { opacity: 0.8 } } as any}>How we compare</Link>
               <span style={{ cursor: 'pointer', transition: 'opacity 0.2s', ':hover': { opacity: 0.8 } } as any}>Pricing</span>
