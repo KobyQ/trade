@@ -45,18 +45,18 @@ export default async function LandingPage() {
         zIndex: -1, pointerEvents: 'none'
       }} />
 
-      {/* Floating Inset Navigation (Finorio Style) */}
-      <div style={{ padding: '24px', display: 'flex', justifyContent: 'center' }}>
+      {/* Floating Inset Navigation */}
+      <div style={{ padding: '16px', display: 'flex', justifyContent: 'center' }}>
         <nav style={{
-          display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+          display: 'flex', flexWrap: 'wrap', justifyContent: 'space-between', alignItems: 'center', gap: '16px',
           background: 'rgba(20, 20, 20, 0.6)', backdropFilter: 'blur(16px)',
-          border: '1px solid rgba(255,255,255,0.05)', borderRadius: '100px',
-          padding: '12px 32px', width: '100%', maxWidth: '1200px',
+          border: '1px solid rgba(255,255,255,0.05)', borderRadius: '32px',
+          padding: '16px 24px', width: '100%', maxWidth: '1200px',
           boxShadow: '0 8px 32px rgba(0,0,0,0.4)'
         }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '48px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '24px', flexWrap: 'wrap' }}>
             <Logo />
-            <div style={{ display: 'flex', gap: '24px', alignItems: 'center', color: '#fff', fontSize: '14px', fontWeight: 600 }} className="hidden md:flex">
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '16px', alignItems: 'center', color: '#fff', fontSize: '14px', fontWeight: 600 }}>
               <Link href="#how-it-works" style={{ color: 'inherit', textDecoration: 'none', transition: 'opacity 0.2s', ':hover': { opacity: 0.8 } } as any}>How it Works</Link>
               <Link href="/compare" style={{ color: 'inherit', textDecoration: 'none', transition: 'opacity 0.2s', ':hover': { opacity: 0.8 } } as any}>How we compare</Link>
               <Link href="#pricing" style={{ color: 'inherit', textDecoration: 'none', transition: 'opacity 0.2s', ':hover': { opacity: 0.8 } } as any}>Pricing</Link>
