@@ -13,6 +13,12 @@ serve(async (req) => {
       console.error("Missing Supabase env vars.");
       return new Response("Server Configuration Error", { status: 500 });
     }
+
+    const authHeader = req.headers.get("Authorization");
+    if (authHeader !== `Bearer ${supabaseKey}`) {
+      return new Response(JSON.stringify({ error: "Unauthorized" }), { status: 401, headers: { "Content-Type": "application/json" } });
+    }
+
     const supabase = createClient(supabaseUrl, supabaseKey);
 
     // Fetch live BYOB users

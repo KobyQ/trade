@@ -234,6 +234,14 @@ serve((req) => {
       { status: 500, headers: { "content-type": "application/json" } },
     );
   }
+
+  const authHeader = req.headers.get("Authorization");
+  if (authHeader !== `Bearer ${key}`) {
+    return new Response(
+      JSON.stringify({ ok: false, error: "Unauthorized" }),
+      { status: 401, headers: { "content-type": "application/json" } },
+    );
+  }
   
   const supabase = createClient(url, key, {
     auth: { persistSession: false },

@@ -10,6 +10,11 @@ serve(async (req) => {
   if (!url || !key) {
     return new Response(JSON.stringify({ ok: false, error: "Missing Supabase env vars" }), { status: 500 });
   }
+
+  const authHeader = req.headers.get("Authorization");
+  if (authHeader !== `Bearer ${key}`) {
+    return new Response(JSON.stringify({ error: "Unauthorized" }), { status: 401, headers: { "Content-Type": "application/json" } });
+  }
   
   const supabase = createClient(url, key);
 
