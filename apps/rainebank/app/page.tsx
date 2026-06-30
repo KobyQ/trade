@@ -1,12 +1,17 @@
 import Link from 'next/link';
 import Logo from '@components/Logo';
-import { supabaseServer } from '@lib/supabase-server';
+import { createClient } from '@supabase/supabase-js';
 
 export default async function LandingPage() {
-  const supabase = supabaseServer();
+  // Use Service Role key to bypass RLS so logged-out users can see the showcase signal
+  // without us having to open the database to public anonymous scraping.
+  const supabaseAdmin = createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!
+  );
   
   // Fetch the latest trade opportunity for the live showcase
-  const { data: latestSignals } = await supabase
+  const { data: latestSignals } = await supabaseAdmin
     .from('trade_opportunities')
     .select('*')
     .in('status', ['PENDING_APPROVAL', 'APPROVED', 'WON', 'LOST'])
@@ -51,10 +56,11 @@ export default async function LandingPage() {
         }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '48px' }}>
             <Logo />
-            <div style={{ display: 'none', gap: '24px', alignItems: 'center', color: '#9ca3af', fontSize: '14px', fontWeight: 500 }} className="md-flex">
-              <span style={{ cursor: 'pointer', transition: 'color 0.2s', ':hover': { color: '#fff' } } as any}>How it Works</span>
-              <span style={{ cursor: 'pointer', transition: 'color 0.2s', ':hover': { color: '#fff' } } as any}>Pricing</span>
-              <span style={{ cursor: 'pointer', transition: 'color 0.2s', ':hover': { color: '#fff' } } as any}>API Docs</span>
+            <div style={{ display: 'flex', gap: '24px', alignItems: 'center', color: '#fff', fontSize: '14px', fontWeight: 600 }} className="hidden md:flex">
+              <Link href="#how-it-works" style={{ color: 'inherit', textDecoration: 'none', transition: 'opacity 0.2s', ':hover': { opacity: 0.8 } } as any}>How it Works</Link>
+              <Link href="/compare" style={{ color: 'inherit', textDecoration: 'none', transition: 'opacity 0.2s', ':hover': { opacity: 0.8 } } as any}>How we compare</Link>
+              <Link href="#pricing" style={{ color: 'inherit', textDecoration: 'none', transition: 'opacity 0.2s', ':hover': { opacity: 0.8 } } as any}>Pricing</Link>
+              <Link href="/docs" style={{ color: 'inherit', textDecoration: 'none', transition: 'opacity 0.2s', ':hover': { opacity: 0.8 } } as any}>API Docs</Link>
             </div>
           </div>
           <div style={{ display: 'flex', gap: '16px', alignItems: 'center' }}>
@@ -137,7 +143,7 @@ export default async function LandingPage() {
         </section>
 
         {/* Simple Explanation Bento Box */}
-        <section style={{ maxWidth: '1200px', width: '100%', marginBottom: '120px' }}>
+        <section id="how-it-works" style={{ maxWidth: '1200px', width: '100%', marginBottom: '120px' }}>
           <div style={{ textAlign: 'center', marginBottom: '64px' }}>
             <h2 style={{ fontSize: '40px', fontWeight: 800, color: '#fff', marginBottom: '16px', letterSpacing: '-1px' }}>How it actually works</h2>
             <p style={{ color: '#9ca3af', fontSize: '18px', maxWidth: '600px', margin: '0 auto' }}>
@@ -175,7 +181,7 @@ export default async function LandingPage() {
         </section>
 
         {/* Pricing Grid */}
-        <section style={{ maxWidth: '1000px', width: '100%', marginBottom: '120px' }}>
+        <section id="pricing" style={{ maxWidth: '1000px', width: '100%', marginBottom: '120px' }}>
           <div style={{ textAlign: 'center', marginBottom: '64px' }}>
             <h2 style={{ fontSize: '40px', fontWeight: 800, color: '#fff', marginBottom: '16px', letterSpacing: '-1px' }}>Pick your plan</h2>
             <p style={{ color: '#9ca3af', fontSize: '18px' }}>Start simple, upgrade when you're ready.</p>
