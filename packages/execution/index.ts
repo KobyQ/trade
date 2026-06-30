@@ -27,17 +27,25 @@ export interface OrderRequest {
   clientOrderId?: string;
 }
 
-async function alpacaFetch(path: string, opts: RequestInit) {
-  const base = 'https://paper-api.alpaca.markets/v2';
+async function metaApiFetch(path: string, opts: RequestInit, accountId?: string) {
+  const token = getEnv('METAAPI_TOKEN');
+  const region = getEnv('METAAPI_REGION') || 'new-york';
+  const base = `https://mt-client-api-v1.${region}.agiliumtrade.ai`;
+  
   const headers = {
-    'APCA-API-KEY-ID': process.env.BROKER_KEY,
-    'APCA-API-SECRET-KEY': process.env.BROKER_SECRET,
+    'auth-token': token,
     ...(opts.headers || {}),
   } as Record<string, string>;
-  const res = await fetch(`${base}${path}`, { ...opts, headers });
+  
+  // If path doesn't start with /users, auto-prefix it for the account
+  const fullPath = path.startsWith('/users') 
+    ? `${base}${path}` 
+    : `${base}/users/current/accounts/${accountId || getEnv('METAAPI_ACCOUNT_ID')}${path}`;
+    
+  const res = await fetch(fullPath, { ...opts, headers });
   if (!res.ok) {
     const text = await res.text();
-    throw new Error(`Alpaca error ${res.status}: ${text}`);
+    throw new Error(`MetaAPI error ${res.status}: ${text}`);
   }
   return res.json();
 }
@@ -64,18 +72,25 @@ export async function placePaperOrder(
     });
   }
 
-  const res = await alpacaFetch('/orders', {
+  // Map order type to MetaAPI actionType
+  let actionType = 'ORDER_TYPE_BUY';
+  if (order.type === 'market') {
+    actionType = order.side === 'buy' ? 'ORDER_TYPE_BUY' : 'ORDER_TYPE_SELL';
+  } else if (order.type === 'limit') {
+    actionType = order.side === 'buy' ? 'ORDER_TYPE_BUY_LIMIT' : 'ORDER_TYPE_SELL_LIMIT';
+  } else if (order.type === 'stop') {
+    actionType = order.side === 'buy' ? 'ORDER_TYPE_BUY_STOP' : 'ORDER_TYPE_SELL_STOP';
+  }
+
+  const res = await metaApiFetch('/trade', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
+      actionType,
       symbol: order.symbol,
-      side: order.side,
-      qty: order.qty,
-      type: order.type,
-      time_in_force: order.tif || 'day',
-      limit_price: order.limitPrice,
-      stop_price: order.stopPrice,
-      client_order_id: order.clientOrderId,
+      volume: order.qty,
+      openPrice: order.limitPrice || order.stopPrice,
+      clientId: order.clientOrderId,
     }),
   });
 
@@ -99,26 +114,29 @@ export interface TrackedOrderRequest extends OrderRequest {
 export async function placeAndTrackOrder(req: TrackedOrderRequest) {
   const clientOrderId =
     req.clientOrderId || makeClientOrderId(req.tradeId, req.n);
+  
+  // MetaAPI synchronously executes market orders and returns the result
   const orderRes = await placePaperOrder({ ...req, clientOrderId });
+
+  const isFilled = orderRes.stringCode === 'ERR_NO_ERROR' || orderRes.orderId;
+  const status = isFilled ? 'FILLED' : 'FAILED';
 
   const { data: orderRow } = await req.supabase
     .from('orders')
     .insert({
       trade_id: req.tradeId,
-      broker: 'PAPER',
+      broker: 'METAAPI',
       client_order_id: clientOrderId,
       type: req.type,
       side: req.side,
       qty: req.qty,
-      status: (orderRes.status || 'new').toUpperCase(),
+      status: status,
+      price: orderRes.price,
       raw_request: {
         symbol: req.symbol,
         side: req.side,
         qty: req.qty,
         type: req.type,
-        time_in_force: req.tif || 'day',
-        limit_price: req.limitPrice,
-        stop_price: req.stopPrice,
         client_order_id: clientOrderId,
       },
       raw_response: orderRes,
@@ -130,40 +148,17 @@ export async function placeAndTrackOrder(req: TrackedOrderRequest) {
     throw new Error('Failed to insert order into database');
   }
 
-  let filledQty = 0;
-  let status = orderRes.status as string;
-  let last = orderRes;
-  let loops = 0;
-  while (status !== 'filled' && status !== 'canceled' && loops < 10) {
-    await new Promise((r) => setTimeout(r, 1000));
-    const upd = await alpacaFetch(`/orders/${orderRes.id}`, {
-      method: 'GET',
+  // If filled, log the execution
+  if (isFilled && orderRes.price) {
+    await req.supabase.from('executions').insert({
+      order_id: orderRow.id,
+      price: Number(orderRes.price),
+      qty: req.qty, // MetaAPI market orders usually fill the entire requested volume
+      raw_fill: orderRes,
     });
-    status = upd.status;
-    const newFilled = Number(upd.filled_qty || 0);
-    if (newFilled > filledQty) {
-      const diff = newFilled - filledQty;
-      await req.supabase.from('executions').insert({
-        order_id: orderRow.id,
-        price: Number(upd.filled_avg_price),
-        qty: diff,
-        raw_fill: upd,
-      });
-      filledQty = newFilled;
-    }
-    last = upd;
-    loops++;
   }
 
-  await req.supabase
-    .from('orders')
-    .update({
-      status: status.toUpperCase(),
-      price: filledQty ? Number(last.filled_avg_price) : undefined,
-    })
-    .eq('id', orderRow.id);
-
-  return { orderId: orderRow.id, clientOrderId, filledQty, status };
+  return { orderId: orderRow.id, clientOrderId, filledQty: isFilled ? req.qty : 0, status };
 }
 
 export interface Bar {
@@ -177,25 +172,25 @@ export interface Bar {
 
 export async function fetchPaperBars(
   symbol: string,
-  timeframe = '1D',
+  timeframe = '1h',
   limit = 100,
 ): Promise<Bar[]> {
-  const base = 'https://data.alpaca.markets/v2';
-  const key = getEnv('BROKER_KEY') || process.env.BROKER_KEY || '';
-  const secret = getEnv('BROKER_SECRET') || process.env.BROKER_SECRET || '';
-  const res = await fetch(
-    `${base}/stocks/${symbol}/bars?timeframe=${timeframe}&limit=${limit}`,
-    {
-      headers: {
-        'APCA-API-KEY-ID': key,
-        'APCA-API-SECRET-KEY': secret,
-      },
-    },
-  );
-  if (!res.ok) {
-    const text = await res.text();
-    throw new Error(`Alpaca data error ${res.status}: ${text}`);
+  try {
+    const res = await metaApiFetch(`/historical-market-data/symbols/${symbol}/timeframes/${timeframe}/candles?limit=${limit}`, {
+      method: 'GET'
+    });
+    
+    // Map MetaAPI candles to the expected Bar interface
+    return (res || []).map((c: any) => ({
+      t: c.time,
+      o: c.open,
+      h: c.high,
+      l: c.low,
+      c: c.close,
+      v: c.tickVolume || c.volume || 0,
+    }));
+  } catch (err) {
+    console.warn(`Failed to fetch MetaAPI bars for ${symbol}:`, err);
+    return [];
   }
-  const json = await res.json();
-  return json.bars || [];
 }
