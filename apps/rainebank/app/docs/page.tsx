@@ -2,13 +2,20 @@ import React from 'react';
 import Logo from '@components/Logo';
 import Link from 'next/link';
 import { ArrowLeft } from 'lucide-react';
+import { supabaseServer } from '@lib/supabase-server';
 
 export const metadata = {
   title: 'API Documentation | AI Trading',
   description: 'Integration guide for the Institutional Alpha feed.',
 };
 
-export default function ApiDocs() {
+export default async function ApiDocs() {
+  const supabase = supabaseServer();
+  const { data: { user } } = await supabase.auth.getUser();
+  
+  const backLink = user ? '/dashboard' : '/';
+  const backText = user ? 'Back to Vault' : 'Back to Home';
+
   return (
     <div style={{ padding: '40px 24px', maxWidth: '900px', margin: '0 auto', minHeight: '100vh' }}>
       <div className="page-content" style={{ display: 'flex', flexDirection: 'column', gap: '48px' }}>
@@ -18,9 +25,9 @@ export default function ApiDocs() {
           <Link href="/" style={{ textDecoration: 'none' }}>
             <Logo />
           </Link>
-          <Link href="/dashboard" style={{ color: 'var(--text-secondary)', textDecoration: 'none', fontSize: '14px', fontWeight: 500, display: 'flex', alignItems: 'center', gap: '6px' }}>
+          <Link href={backLink} style={{ color: 'var(--text-secondary)', textDecoration: 'none', fontSize: '14px', fontWeight: 500, display: 'flex', alignItems: 'center', gap: '6px' }}>
             <ArrowLeft size={16} />
-            Back to Vault
+            {backText}
           </Link>
         </nav>
 
