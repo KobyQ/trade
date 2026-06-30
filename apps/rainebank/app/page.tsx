@@ -9,15 +9,16 @@ export default async function LandingPage() {
   const { data: latestSignals } = await supabase
     .from('trade_opportunities')
     .select('*')
+    .in('status', ['PENDING_APPROVAL', 'APPROVED', 'WON', 'LOST'])
     .order('created_at', { ascending: false })
     .limit(1);
     
   const signal = latestSignals?.[0] || {
-    symbol: 'XAUUSD',
-    side: 'BULLISH',
-    status: 'ACTIVE',
-    entry_plan_json: { type: 'Buy Limit', price: 2345.50 },
-    rationale_markdown: 'Price dropped to a strong support level. The AI thinks it is safe to buy here.'
+    symbol: 'SCANNING...',
+    side: 'NEUTRAL',
+    status: 'SEARCHING',
+    entry_plan_json: { type: 'Analysis', price: 'Pending Data' },
+    rationale_markdown: 'The AI Risk Officer is currently scanning the global markets for high-probability setups. Check back shortly.'
   };
 
   const statusColor = signal.status === 'APPROVED' ? '#4ade80' : 
