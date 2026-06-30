@@ -17,8 +17,8 @@ export default async function LandingPage() {
     symbol: 'SCANNING...',
     side: 'NEUTRAL',
     status: 'SEARCHING',
-    entry_plan_json: { type: 'Analysis', price: 'Pending Data' },
-    rationale_markdown: 'The AI Risk Officer is currently scanning the global markets for high-probability setups. Check back shortly.'
+    entry_plan_json: { price: 'Pending Data' },
+    ai_summary: 'The AI Risk Officer is currently scanning the global markets for high-probability setups. Check back shortly.'
   };
 
   const statusColor = signal.status === 'APPROVED' ? '#4ade80' : 
@@ -122,13 +122,13 @@ export default async function LandingPage() {
                 {signal.symbol}
               </div>
               <div style={{ fontSize: '24px', color: '#38bdf8', fontWeight: 600, marginBottom: '32px' }}>
-                {signal.entry_plan_json?.type?.toUpperCase()} @ {signal.entry_plan_json?.price}
+                {signal.side?.toUpperCase()} @ {signal.entry_plan_json?.price}
               </div>
 
               <div style={{ background: '#0a0a0a', padding: '16px', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.05)' }}>
                 <div style={{ fontSize: '12px', color: '#9ca3af', marginBottom: '8px', fontWeight: 600 }}>WHAT THE AI SAID:</div>
                 <p style={{ fontSize: '14px', color: '#e5e7eb', lineHeight: 1.5, margin: 0 }}>
-                  {signal.rationale_markdown?.slice(0, 150)}{signal.rationale_markdown?.length > 150 ? '...' : ''}
+                  {signal.ai_summary?.slice(0, 150)}{signal.ai_summary?.length > 150 ? '...' : ''}
                 </p>
               </div>
             </div>
