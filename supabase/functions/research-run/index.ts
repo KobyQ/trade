@@ -7,6 +7,7 @@ import { isMarketOpen } from "../_shared/market.ts";
 import { netEdge, transactionCost, slippage } from "../../../packages/strategy/index.ts";
 import { getContextSnapshot, LogicContext } from "../../../packages/strategy/indicators.ts";
 import { validateGlobalSignal } from "../../../packages/strategy/riskManager.ts";
+import { fetchMacroEvents } from "../_shared/news.ts";
 import OpenAI from "npm:openai";
 
 async function hashBar(b: Bar) {
@@ -304,9 +305,15 @@ serve((req) => {
             );
             
             // Inject macro context if provided via URL params
+            let fundamental_context = newsContext;
+            if (!fundamental_context) {
+              sendEvent({ type: 'progress', message: `[Macro Data] Fetching economic calendar catalysts for ${symbol}...` });
+              fundamental_context = await fetchMacroEvents(symbol);
+            }
+
             const snapshot = {
               ...rawSnapshot,
-              fundamental_context: newsContext || "No fundamental news provided."
+              fundamental_context
             };
 
             console.log(`[Strategy Eval] Market snapshot for ${symbol}: Trend=${snapshot.trend_alignment}, RSI=${snapshot.rsi_14.toFixed(2)}, CurrentPrice=${snapshot.current_price}`);
