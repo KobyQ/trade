@@ -438,8 +438,10 @@ serve((req) => {
             
             const stopLossPercentage = risk / entry_price;
             let maxAllowedRiskPct = 0.05; // 5% default for macro
-            if (timeframe.toLowerCase().includes("min") || timeframe.toLowerCase().includes("h")) {
-              maxAllowedRiskPct = 0.015; // 1.5% max for intraday
+            if (timeframe.toLowerCase().includes("min") || timeframe === "1H") {
+              maxAllowedRiskPct = 0.015; // 1.5% max for short intraday
+            } else if (timeframe === "4H") {
+              maxAllowedRiskPct = 0.03; // 3% max for 4H swing
             }
 
             if (stopLossPercentage > maxAllowedRiskPct) {
