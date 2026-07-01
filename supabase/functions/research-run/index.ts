@@ -232,16 +232,7 @@ serve((req) => {
     global: { headers: { Authorization: `Bearer ${key}` } },
   });
 
-  const body = new ReadableStream({
-    async start(controller) {
-      function sendEvent(data: any) {
-        try {
-          controller.enqueue(new TextEncoder().encode(`data: ${JSON.stringify(data)}\n\n`));
-        } catch (e) {
-          console.error("Stream closed", e);
-        }
-      }
-
+  async function runPipeline(sendEvent: (data: any) => void) {
       const results: any[] = [];
       const rejections: any[] = [];
       
@@ -574,6 +565,24 @@ serve((req) => {
         }
 
         sendEvent({ type: 'complete', opportunities: results, rejections });
+        return { opportunities: results, rejections };
+  }
+
+  if (isCron) {
+    const data = await runPipeline(() => {});
+    return new Response(JSON.stringify(data), {
+      status: 200,
+      headers: { "Content-Type": "application/json" }
+    });
+  }
+
+  const body = new ReadableStream({
+    async start(controller) {
+      function sendEvent(data: any) {
+        try { controller.enqueue(new TextEncoder().encode(`data: ${JSON.stringify(data)}\n\n`)); } catch (e) {}
+      }
+      try {
+        await runPipeline(sendEvent);
       } finally {
         controller.close();
       }
