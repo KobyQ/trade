@@ -1,4 +1,4 @@
-import { EMA, RSI, ADX, ATR } from 'technicalindicators';
+import { EMA, RSI, ADX, ATR, BollingerBands } from 'technicalindicators';
 
 export type LogicContext = {
   timestamp: string;
@@ -8,6 +8,9 @@ export type LogicContext = {
   rsi_14: number | null;
   adx_14: number | null;
   atr_14: number | null;
+  bb_upper: number | null;
+  bb_lower: number | null;
+  htf_trend?: 'BULLISH' | 'BEARISH' | 'CHOP';
   recent_swing_high: number | null;
   recent_swing_low: number | null;
   safe_long_stop_loss: number | null;
@@ -31,6 +34,8 @@ export function getContextSnapshot(
       rsi_14: null,
       adx_14: null,
       atr_14: null,
+      bb_upper: null,
+      bb_lower: null,
       recent_swing_high: null,
       recent_swing_low: null,
       safe_long_stop_loss: null,
@@ -54,6 +59,7 @@ export function getContextSnapshot(
   const ema200 = EMA.calculate({ period: 200, values: close });
   const rsi14 = RSI.calculate({ period: 14, values: close });
   const atr14 = ATR.calculate({ period: 14, high, low, close });
+  const bb20 = BollingerBands.calculate({ period: 20, values: close, stdDev: 2 });
   
   let adx14: number[] = [];
   try {
@@ -69,6 +75,9 @@ export function getContextSnapshot(
   const current_rsi_14 = rsi14.length > 0 ? rsi14[rsi14.length - 1] : null;
   const current_adx_14 = adx14.length > 0 ? adx14[adx14.length - 1] : null;
   const current_atr_14 = atr14.length > 0 ? atr14[atr14.length - 1] : null;
+  
+  const current_bb_upper = bb20.length > 0 ? bb20[bb20.length - 1].upper : null;
+  const current_bb_lower = bb20.length > 0 ? bb20[bb20.length - 1].lower : null;
 
   // Calculate safe structural stop loss boundaries
   const atrBuffer = current_atr_14 !== null ? current_atr_14 * 1.5 : 0;
@@ -116,6 +125,8 @@ export function getContextSnapshot(
     rsi_14: current_rsi_14 ? Number(current_rsi_14.toFixed(2)) : null,
     adx_14: current_adx_14 ? Number(current_adx_14.toFixed(2)) : null,
     atr_14: current_atr_14 ? Number(current_atr_14.toFixed(2)) : null,
+    bb_upper: current_bb_upper ? Number(current_bb_upper.toFixed(2)) : null,
+    bb_lower: current_bb_lower ? Number(current_bb_lower.toFixed(2)) : null,
     recent_swing_high,
     recent_swing_low,
     safe_long_stop_loss: safe_long_stop_loss ? Number(safe_long_stop_loss.toFixed(2)) : null,
