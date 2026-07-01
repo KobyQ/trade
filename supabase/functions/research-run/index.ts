@@ -237,7 +237,14 @@ serve((req) => {
   }
 
   const authHeader = req.headers.get("Authorization");
-  if (authHeader !== `Bearer ${key}`) {
+  const cronSecretHeader = req.headers.get("x-cron-secret");
+  const cronSecretEnv = Deno.env.get("CRON_SECRET");
+  
+  const isAuthorized = 
+    authHeader === `Bearer ${key}` || 
+    (cronSecretHeader && cronSecretEnv && cronSecretHeader === cronSecretEnv);
+
+  if (!isAuthorized) {
     return new Response(
       JSON.stringify({ ok: false, error: "Unauthorized" }),
       { status: 401, headers: { "content-type": "application/json" } },
