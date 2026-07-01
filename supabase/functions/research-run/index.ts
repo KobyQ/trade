@@ -84,38 +84,27 @@ ${historicalMemory || "No historical data available for this asset yet."}
 You MUST respond strictly with a raw JSON object matching the exact schema below. Do not include any markdown formatting (like \`\`\`json), wrapper text, HTML tags, or conversational preambles. If you include anything other than raw JSON, the system breaks.
 
 {
-  "setup_valid": boolean,
-  "action": "APPROVED" | "REJECTED",
+  "market_structure": "BULLISH_TREND" | "BEARISH_TREND" | "RANGING" | "BREAKOUT",
+  "recommended_direction": "LONG" | "SHORT" | "NONE",
+  "strategy_applied": "PULLBACK" | "MOMENTUM_CONTINUATION" | "MEAN_REVERSION" | "NONE",
   "execution_parameters": {
-    "entry_type": "Buy Limit" | "Sell Limit" | "Buy Stop" | "Sell Stop" | "NONE",
+    "entry_type": "Buy Limit" | "Sell Limit" | "Buy Stop" | "Sell Stop" | "Market" | "NONE",
     "suggested_entry_price": number | null,
     "suggested_stop_loss": number | null,
     "suggested_take_profit": number | null
   },
   "confidence_score": number,
   "institutional_rationale": {
-    "timeframe_context": "Explain how the timeframe impacts the weight of the RSI and setup.",
-    "key_levels": "Define structural boundaries AND explicitly state the current price relative to those levels (e.g., 'At the current price of 4015, the asset is trapped between support at 3980 and resistance at 4050').",
-    "fundamental_catalyst": "Synthesize the provided news headlines. If there is macroeconomic news (e.g. CPI, Fed Rate), explicitly state how it supports or invalidates the technical setup. DO NOT use the phrase 'Without fundamental context'.",
-    "intermarket_context": "Specify EXACT macro correlations. If fundamental sentiment contradicts technical trends (e.g., bearish macro vs bullish EMAs), you MUST explicitly state which force you expect to win and why.",
-    "if_then_scenario": "Map out exactly what price action would create/invalidate a valid entry. Do NOT be vague. If analyzing a 1D or 4H chart, you MUST specify a lower-timeframe execution trigger (e.g., 'Wait for a 1H bullish engulfing candle' or '15m market structure shift') at your entry level to keep stops tight. You MUST strictly define the Stop Loss placement (e.g., 'Stop placed strictly below the swing low of that engulfing candle') and the initial Take Profit target (e.g., 'primary target at 4050 resistance') to create a bulletproof trading plan.",
-    "confluence_check": "State exactly where the current price is relative to the 50/200 EMAs to validate your momentum thesis. Project what the RSI should ideally look like when price reaches your entry level. Do NOT repeat the RSI or EMA conditions across multiple sentences."
-  },
-  "alternative_setup": {
-    "direction_suggested": "LONG" | "SHORT" | "NONE",
-    "entry_type": "Buy Limit" | "Sell Limit" | "Buy Stop" | "Sell Stop" | "NONE",
-    "suggested_entry_price": number | null,
-    "suggested_stop_loss": number | null,
-    "suggested_take_profit": number | null,
-    "pivot_rationale": "Focus ONLY on the alternative setup. Explain why the counter-trade works, specify a structural Take Profit target, and explicitly define a lower-timeframe price action trigger required at your entry level (e.g. 'Wait for a 1H bearish pin bar at 4050 before shorting'). OR explicitly explain why BOTH directions are untradeable due to structural 'empty air'."
+    "directional_bias": "Explain why the recommended direction is the path of least resistance based on EMAs and key levels.",
+    "execution_trigger": "Specify the exact lower-timeframe price action required at the entry price to trigger the trade.",
+    "invalidation_point": "Explain exactly why the stop loss is placed where it is structurally.",
+    "fundamental_alignment": "State how the technical setup aligns with or fights current macro drivers."
   }
 }
 
 [RISK EVALUATION RULES]
-1. PULLBACK setups (BULLISH_PULLBACK or BEARISH_PULLBACK) are your preferred swing trade entries.
-   - For a Pullback LONG, your entry price MUST be placed precisely ON or slightly BELOW the nearest structural support. Do not buy ahead of support. Your Take Profit MUST be set at the next major structural resistance.
-   - For a Pullback SHORT, your entry price MUST be placed precisely ON or slightly ABOVE structural resistance. Your Take Profit MUST be set at the next major structural support.
-2. TREND breakouts (BULLISH_TREND or BEARISH_TREND) are accepted only if RSI is not over-extended.
+1. DYNAMIC STRATEGY SELECTION: Do not default to pullbacks. First, identify the market structure. If the asset is trending heavily (Price > 50 & 200 EMA), prioritize MOMENTUM_CONTINUATION setups using minor retracements. If the asset is trapped between major support and resistance, prioritize MEAN_REVERSION setups targeting the range boundaries.
+2. THE 'EMPTY AIR' CHECK: Before suggesting a direction, evaluate the distance to the next major liquidity zone. If the current price is floating in 'empty air' midway between support and resistance with no clear edge, set \`recommended_direction\` to \`NONE\` and protect capital.
 3. STOP LOSS & VOLATILITY (ATR): The snapshot provides \`safe_long_stop_loss\`, \`safe_short_stop_loss\`, and \`atr_14\`. 
    - Your \`suggested_stop_loss\` MUST exactly match the price point at which your setup is technically invalidated.
    - VOLATILITY CHECK: Your stop loss distance MUST be wide enough to survive the \`atr_14\` (Average True Range).
@@ -125,17 +114,15 @@ You MUST respond strictly with a raw JSON object matching the exact schema below
 5. COUNTER-TREND MOMENTUM CHECK: 
    - Strict Technical Definitions: Price > 50 EMA and > 200 EMA = BULLISH momentum. Price < 50 EMA and < 200 EMA = BEARISH momentum. Do not contradict this.
    - Do not blindly buy assets that are crashing well below both the 50 EMA and 200 EMA just because RSI is low. REJECT long setups if the asset is in heavy bearish momentum unless price is within 0.1% to 0.25% of a major, higher-timeframe support level.
-6. THE PIVOT RULE: If you REJECT a LONG setup because the asset is in heavy bearish momentum (Rule 5), you MUST immediately evaluate if a valid SHORT setup exists. If current price is also too far from resistance to safely short, you MUST set "direction_suggested" to "NONE" and explain why in the "pivot_rationale".
-7. INSTITUTIONAL TONE: 
+6. INSTITUTIONAL TONE: 
    - Never use apologetic, weak, or observational phrasing regarding missing data. If fundamental data is missing, do NOT claim there is a "lack of fundamental catalysts" (as macro is always active). Instead, dictate authoritatively: "Without fundamental context, this must be treated as a purely technical setup."
    - Write with bulletproof brevity. Do NOT repeat your rationale. Never state the moving average conditions (price above 50/200 EMA) or RSI targets multiple times in the same output. Combine your thoughts into a single, sharp thesis.
-8. RSI DYNAMICS IN TRENDS: In a strong uptrend (Price > 50 EMA and > 200 EMA), the daily RSI rarely drops all the way to 30. A pullback to the 40-45 range is typically sufficient to reset momentum. Do NOT demand a drop to 30 if the asset is in heavy bullish momentum.
-9. DIRECTIONAL MATH & SUPPORT VALIDATION: You MUST perform basic directional math. If Current Price < Support, the support has been BROKEN and is now Resistance. If Current Price > Resistance, it is now Support. Do not suggest a "pullback to support" if price has already broken below it. If structural support has failed, a pullback entry is invalid unless price fully reclaims the level.
+7. RSI DYNAMICS IN TRENDS: In a strong uptrend (Price > 50 EMA and > 200 EMA), the daily RSI rarely drops all the way to 30. A pullback to the 40-45 range is typically sufficient to reset momentum. Do NOT demand a drop to 30 if the asset is in heavy bullish momentum.
+8. DIRECTIONAL MATH & SUPPORT VALIDATION: You MUST perform basic directional math. If Current Price < Support, the support has been BROKEN and is now Resistance. If Current Price > Resistance, it is now Support. Do not suggest a "pullback to support" if price has already broken below it. If structural support has failed, a pullback entry is invalid unless price fully reclaims the level.
 Current Market Context:
 ${JSON.stringify(snapshot, null, 2)}`;
 
-  const direction = snapshot.trend_alignment.startsWith('BULLISH') ? 'LONG (BUY)' : 'SHORT (SELL)';
-  const userPrompt = `Evaluate the ${snapshot.trend_alignment} setup for ${symbol} on the ${timeframe} timeframe at current price ${snapshot.current_price} for a potential ${direction} position. Return the required JSON object execution profile.`;
+  const userPrompt = `Evaluate the raw market data for ${symbol} on the ${timeframe} timeframe at current price ${snapshot.current_price} and autonomously originate the highest probability trade setup, if any. Return the required JSON object execution profile.`;
 
   const response = await openai.chat.completions.create({
     model: "gpt-4o",
@@ -150,12 +137,13 @@ ${JSON.stringify(snapshot, null, 2)}`;
         schema: {
           type: "object",
           properties: {
-            setup_valid: { type: "boolean" },
-            action: { type: "string", enum: ["APPROVED", "REJECTED"] },
+            market_structure: { type: "string", enum: ["BULLISH_TREND", "BEARISH_TREND", "RANGING", "BREAKOUT"] },
+            recommended_direction: { type: "string", enum: ["LONG", "SHORT", "NONE"] },
+            strategy_applied: { type: "string", enum: ["PULLBACK", "MOMENTUM_CONTINUATION", "MEAN_REVERSION", "NONE"] },
             execution_parameters: {
               type: "object",
               properties: {
-                entry_type: { type: "string", enum: ["Buy Limit", "Sell Limit", "Buy Stop", "Sell Stop", "NONE"] },
+                entry_type: { type: "string", enum: ["Buy Limit", "Sell Limit", "Buy Stop", "Sell Stop", "Market", "NONE"] },
                 suggested_entry_price: { type: ["number", "null"] },
                 suggested_stop_loss: { type: ["number", "null"] },
                 suggested_take_profit: { type: ["number", "null"] }
@@ -167,31 +155,16 @@ ${JSON.stringify(snapshot, null, 2)}`;
             institutional_rationale: {
               type: "object",
               properties: {
-                timeframe_context: { type: "string" },
-                key_levels: { type: "string" },
-                fundamental_catalyst: { type: "string" },
-                intermarket_context: { type: "string" },
-                if_then_scenario: { type: "string" },
-                confluence_check: { type: "string" }
+                directional_bias: { type: "string" },
+                execution_trigger: { type: "string" },
+                invalidation_point: { type: "string" },
+                fundamental_alignment: { type: "string" }
               },
-              required: ["timeframe_context", "key_levels", "fundamental_catalyst", "intermarket_context", "if_then_scenario", "confluence_check"],
-              additionalProperties: false
-            },
-            alternative_setup: {
-              type: "object",
-              properties: {
-                direction_suggested: { type: "string", enum: ["LONG", "SHORT", "NONE"] },
-                entry_type: { type: "string", enum: ["Buy Limit", "Sell Limit", "Buy Stop", "Sell Stop", "NONE"] },
-                suggested_entry_price: { type: ["number", "null"] },
-                suggested_stop_loss: { type: ["number", "null"] },
-                suggested_take_profit: { type: ["number", "null"] },
-                pivot_rationale: { type: "string" }
-              },
-              required: ["direction_suggested", "entry_type", "suggested_entry_price", "suggested_stop_loss", "suggested_take_profit", "pivot_rationale"],
+              required: ["directional_bias", "execution_trigger", "invalidation_point", "fundamental_alignment"],
               additionalProperties: false
             }
           },
-          required: ["setup_valid", "action", "execution_parameters", "confidence_score", "institutional_rationale", "alternative_setup"],
+          required: ["market_structure", "recommended_direction", "strategy_applied", "execution_parameters", "confidence_score", "institutional_rationale"],
           additionalProperties: false
         },
         strict: true
@@ -395,41 +368,31 @@ serve((req) => {
               continue;
             }
 
-            let is_valid = evaluation.setup_valid && evaluation.action !== "REJECTED";
+            let is_valid = evaluation.recommended_direction !== "NONE";
             
-            let dbSide = snapshot.trend_alignment.startsWith('BULLISH') ? 'LONG' : 'SHORT';
+            let dbSide = evaluation.recommended_direction === "NONE" 
+              ? (snapshot.trend_alignment.startsWith('BULLISH') ? 'LONG' : 'SHORT') 
+              : evaluation.recommended_direction;
+            
             let entry_price = evaluation.execution_parameters?.suggested_entry_price || snapshot.current_price;
             let stop_loss = evaluation.execution_parameters?.suggested_stop_loss || (dbSide === "LONG" ? snapshot.safe_long_stop_loss : snapshot.safe_short_stop_loss);
             const confidence_score = evaluation.confidence_score || 50;
             
             const rationaleObj = evaluation.institutional_rationale || {};
             let institutional_rationale = [
-              rationaleObj.timeframe_context,
-              rationaleObj.key_levels,
-              rationaleObj.intermarket_context,
-              rationaleObj.if_then_scenario,
-              rationaleObj.confluence_check
+              `[${evaluation.market_structure} -> ${evaluation.strategy_applied}]`,
+              rationaleObj.directional_bias,
+              rationaleObj.execution_trigger,
+              rationaleObj.invalidation_point,
+              rationaleObj.fundamental_alignment
             ].filter(Boolean).join(" ");
 
-            console.log(`[Layer B: Cognitive Guard] AI Response for ${symbol}: Valid Setup = ${is_valid}`);
+            console.log(`[Layer B: Cognitive Guard] AI Response for ${symbol}: Valid Setup = ${is_valid}, Direction = ${evaluation.recommended_direction}`);
             console.log(`[Layer B] AI Rationale: ${institutional_rationale}`);
 
-            // === PIVOT MECHANIC EXECUTION ===
-            const alt = evaluation.alternative_setup;
-            if (!is_valid && alt && alt.direction_suggested !== 'NONE' && alt.suggested_entry_price && alt.suggested_stop_loss) {
-              console.log(`[Layer B: Pivot] Primary setup rejected. Pivoting to alternative ${alt.direction_suggested} setup.`);
-              sendEvent({ type: 'progress', message: `[Layer B: Pivot] Primary rejected. Pivoting to ${alt.direction_suggested} setup.` });
-              
-              is_valid = true; // Validate the pivot setup
-              dbSide = alt.direction_suggested;
-              entry_price = alt.suggested_entry_price;
-              stop_loss = alt.suggested_stop_loss;
-              institutional_rationale = `PIVOT RATIONALE: ${alt.pivot_rationale}\n\nORIGINAL REJECTION: ${institutional_rationale}`;
-            }
-
             if (!is_valid) {
-              console.log(`[Layer B: Cognitive Guard] REJECTED ${symbol} by AI Risk Officer.`);
-              sendEvent({ type: 'progress', message: `[Layer B: AI Risk Officer] REJECTED ${symbol} based on institutional logic.` });
+              console.log(`[Layer B: Cognitive Guard] REJECTED ${symbol} by AI Risk Officer (No Edge / Empty Air).`);
+              sendEvent({ type: 'progress', message: `[Layer B: AI Risk Officer] REJECTED ${symbol} based on institutional logic (No Edge).` });
               await insertAuditLog(supabase, {
                 actor_type: "SYSTEM",
                 action: "REJECTED_BY_AI",
