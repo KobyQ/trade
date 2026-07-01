@@ -566,6 +566,10 @@ serve((req) => {
 
         sendEvent({ type: 'complete', opportunities: results, rejections });
         return { opportunities: results, rejections };
+      } catch (err: any) {
+        console.error(`[Pipeline Error] ${err.message}`);
+        return { error: err.message };
+      }
   }
 
   if (isCron) {
