@@ -119,8 +119,10 @@ You MUST respond strictly with a raw JSON object matching the exact schema below
 6. INSTITUTIONAL TONE: 
    - Never use apologetic, weak, or observational phrasing regarding missing data. If fundamental data is missing, do NOT claim there is a "lack of fundamental catalysts" (as macro is always active). Instead, dictate authoritatively: "Without fundamental context, this must be treated as a purely technical setup."
    - Write with bulletproof brevity. Do NOT repeat your rationale. Never state the moving average conditions (price above 50/200 EMA) or RSI targets multiple times in the same output. Combine your thoughts into a single, sharp thesis.
-7. RSI DYNAMICS IN TRENDS: In a strong uptrend (Price > 50 EMA and > 200 EMA), the daily RSI rarely drops all the way to 30. A pullback to the 40-45 range is typically sufficient to reset momentum. Do NOT demand a drop to 30 if the asset is in heavy bullish momentum.
-8. DIRECTIONAL MATH & SUPPORT VALIDATION: You MUST perform basic directional math. If Current Price < Support, the support has been BROKEN and is now Resistance. If Current Price > Resistance, it is now Support. Do not suggest a "pullback to support" if price has already broken below it. If structural support has failed, a pullback entry is invalid unless price fully reclaims the level.
+7. MULTI-TIMEFRAME ALIGNMENT: You are provided with the 'htf_trend' (Daily macro trend). You MUST NEVER suggest a setup that fights the Daily trend unless there is a devastating, top-tier fundamental catalyst reversing the market. If 4H is BULLISH but 1D is BEARISH, REJECT the setup (NONE).
+8. BOLLINGER BAND EXHAUSTION: You are provided with 'bb_upper' and 'bb_lower'. NEVER suggest a LONG entry if the current price is at or above 'bb_upper' (overbought). NEVER suggest a SHORT entry if the price is at or below 'bb_lower' (oversold). Wait for mean reversion.
+9. RSI DYNAMICS IN TRENDS: In a strong uptrend (Price > 50 EMA and > 200 EMA), the daily RSI rarely drops all the way to 30. A pullback to the 40-45 range is typically sufficient to reset momentum. Do NOT demand a drop to 30 if the asset is in heavy bullish momentum.
+10. DIRECTIONAL MATH & SUPPORT VALIDATION: You MUST perform basic directional math. If Current Price < Support, the support has been BROKEN and is now Resistance. If Current Price > Resistance, it is now Support. Do not suggest a "pullback to support" if price has already broken below it. If structural support has failed, a pullback entry is invalid unless price fully reclaims the level.
 Current Market Context:
 ${JSON.stringify(snapshot, null, 2)}`;
 
@@ -288,12 +290,32 @@ serve((req) => {
 
             // LAYER A: Deterministic Evaluation Guard
             sendEvent({ type: 'progress', message: `[Layer A: Deterministic Guard] Evaluating mathematical momentum and regime...` });
+            
+            // Fetch 1D Macro Trend
+            let htf_trend: 'BULLISH' | 'BEARISH' | 'CHOP' = 'CHOP';
+            if (timeframe !== '1D') {
+              try {
+                const result = await fetchPaperBars(symbol, '1D');
+                const dailySnapshot = getContextSnapshot(
+                  result.bars.map((b: any) => b.t),
+                  result.bars.map((b: any) => b.h),
+                  result.bars.map((b: any) => b.l),
+                  result.bars.map((b: any) => b.c)
+                );
+                if (dailySnapshot.trend_alignment.startsWith('BULLISH')) htf_trend = 'BULLISH';
+                else if (dailySnapshot.trend_alignment.startsWith('BEARISH')) htf_trend = 'BEARISH';
+              } catch (e) {
+                console.warn(`[Macro Fetch] Failed to fetch 1D trend for ${symbol}`);
+              }
+            }
+
             const rawSnapshot = getContextSnapshot(
               bars.map((b) => b.t),
               bars.map((b) => b.h),
               bars.map((b) => b.l),
               bars.map((b) => b.c)
             );
+            rawSnapshot.htf_trend = htf_trend;
             
             // Inject macro context if provided via URL params
             let fundamental_context = newsContext;
@@ -391,18 +413,22 @@ serve((req) => {
             console.log(`[Layer B: Cognitive Guard] AI Response for ${symbol}: Valid Setup = ${is_valid}, Direction = ${evaluation.recommended_direction}`);
             console.log(`[Layer B] AI Rationale: ${institutional_rationale}`);
 
-            if (!is_valid) {
-              console.log(`[Layer B: Cognitive Guard] REJECTED ${symbol} by AI Risk Officer (No Edge / Empty Air).`);
-              sendEvent({ type: 'progress', message: `[Layer B: AI Risk Officer] REJECTED ${symbol} based on institutional logic (No Edge).` });
+            if (!is_valid || confidence_score < 80) {
+              const rejectReason = !is_valid 
+                ? institutional_rationale 
+                : `AI Confidence Score (${confidence_score}) below 80 threshold.`;
+                
+              console.log(`[Layer B: Cognitive Guard] REJECTED ${symbol} by AI Risk Officer: ${rejectReason}`);
+              sendEvent({ type: 'progress', message: `[Layer B: AI Risk Officer] REJECTED ${symbol}: ${rejectReason}` });
               await insertAuditLog(supabase, {
                 actor_type: "SYSTEM",
                 action: "REJECTED_BY_AI",
                 entity_type: "research",
-                payload_json: { symbol, reason: institutional_rationale, context: snapshot },
+                payload_json: { symbol, reason: rejectReason, context: snapshot },
               });
               rejections.push({
                 symbol,
-                reason: institutional_rationale,
+                reason: rejectReason,
                 layer: "Cognitive AI"
               });
               await supabase.from("trade_opportunities").insert({
@@ -410,7 +436,7 @@ serve((req) => {
                 side: dbSide,
                 timeframe: timeframe.toLowerCase(),
                 status: "REJECTED",
-                ai_summary: institutional_rationale,
+                ai_summary: rejectReason,
                 ai_risks: "Rejected by AI Risk Officer",
                 model_id: modelId,
                 model_version: modelVersion,
