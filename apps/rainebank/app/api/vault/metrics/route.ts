@@ -12,10 +12,13 @@ export async function GET() {
   const supabase = createClient(url, key);
 
   try {
+    const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
+
     const { data: closedTrades, error } = await supabase
       .from('trade_opportunities')
       .select('status, r_multiple, closed_at')
       .in('status', ['WON', 'LOST'])
+      .gte('closed_at', thirtyDaysAgo)
       .order('closed_at', { ascending: true });
 
     if (error) {
