@@ -143,6 +143,8 @@ export async function fetchPaperBars(symbol: string, timeframe = '1D', limit = 3
 
     if (symbol === 'UKOIL') {
       yfSymbol = 'BZ=F'; // Brent Crude Oil Futures as proxy for UKOIL
+    } else if (symbol === 'XAUUSD') {
+      yfSymbol = 'GC=F'; // Gold Futures as proxy for XAUUSD
     } else if (isCrypto && symbol.endsWith('USD')) {
       // BTCUSD -> BTC-USD
       yfSymbol = symbol.replace('USD', '') + '-USD';

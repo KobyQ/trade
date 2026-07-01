@@ -98,6 +98,7 @@ You MUST respond strictly with a raw JSON object matching the exact schema below
     "directional_bias": "Explain why the recommended direction is the path of least resistance based on EMAs and key levels.",
     "execution_trigger": "Specify the exact lower-timeframe price action required at the entry price to trigger the trade.",
     "invalidation_point": "Explain exactly why the stop loss is placed where it is structurally.",
+    "take_profit_target": "Specify at least one concrete Take Profit price level and the projected Risk:Reward ratio (minimum 1:1.5).",
     "fundamental_alignment": "State how the technical setup aligns with or fights current macro drivers."
   }
 }
@@ -107,7 +108,7 @@ You MUST respond strictly with a raw JSON object matching the exact schema below
 2. THE 'EMPTY AIR' CHECK: Before suggesting a direction, evaluate the distance to the next major liquidity zone. If the current price is floating in 'empty air' midway between support and resistance with no clear edge, set \`recommended_direction\` to \`NONE\` and protect capital.
 3. STOP LOSS & VOLATILITY (ATR): The snapshot provides \`safe_long_stop_loss\`, \`safe_short_stop_loss\`, and \`atr_14\`. 
    - Your \`suggested_stop_loss\` MUST exactly match the price point at which your setup is technically invalidated.
-   - VOLATILITY CHECK: Your stop loss distance MUST be wide enough to survive the \`atr_14\` (Average True Range).
+   - VOLATILITY CHECK: Your stop loss distance MUST be wide enough to survive the \`atr_14\` (Average True Range) but MUST NOT exceed 3x the \`atr_14\`. If the structural stop required is greater than 3x the ATR, the setup is mathematically untradeable. REJECT it by setting recommended_direction to NONE.
 4. FUNDAMENTAL REALITY CHECK: You MUST heavily weigh the provided \`fundamental_context\`. If significant macro news opposes the technical setup, REJECT the setup immediately. If no major news exists, explicitly note that the market is driven by technicals, but NEVER say 'Without fundamental context'.
    - Do NOT invent generic macro platitudes (like 'geopolitical tensions' or 'inflation'). If you assess the macro environment, focus on the actual dominant drivers pushing the asset's current trend (e.g. hawkish Fed policy, strong DXY causing a massive drop).
    - If fundamental reality is BEARISH, REJECT any LONG setups. If BULLISH, REJECT any SHORT setups.
@@ -158,9 +159,10 @@ ${JSON.stringify(snapshot, null, 2)}`;
                 directional_bias: { type: "string" },
                 execution_trigger: { type: "string" },
                 invalidation_point: { type: "string" },
+                take_profit_target: { type: "string" },
                 fundamental_alignment: { type: "string" }
               },
-              required: ["directional_bias", "execution_trigger", "invalidation_point", "fundamental_alignment"],
+              required: ["directional_bias", "execution_trigger", "invalidation_point", "take_profit_target", "fundamental_alignment"],
               additionalProperties: false
             }
           },
@@ -384,6 +386,7 @@ serve((req) => {
               rationaleObj.directional_bias,
               rationaleObj.execution_trigger,
               rationaleObj.invalidation_point,
+              rationaleObj.take_profit_target,
               rationaleObj.fundamental_alignment
             ].filter(Boolean).join(" ");
 
