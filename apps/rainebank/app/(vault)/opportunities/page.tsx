@@ -17,16 +17,26 @@ type Opportunity = {
 };
 
 function parseAnalysisText(text: string) {
-  const match = text.match(/^\[(.*?) -> (.*?)\]/);
-  if (!match) return { structure: null, strategy: null, content: text };
+  const match = text.match(/^\[(.*?-Tier)\] \[(.*?) -> (.*?)\]/);
+  if (!match) {
+    const fallbackMatch = text.match(/^\[(.*?) -> (.*?)\]/);
+    if (!fallbackMatch) return { tier: null, structure: null, strategy: null, content: text };
+    return {
+      tier: null,
+      structure: fallbackMatch[1],
+      strategy: fallbackMatch[2],
+      content: text.replace(fallbackMatch[0], '').trim()
+    };
+  }
   return {
-    structure: match[1],
-    strategy: match[2],
+    tier: match[1],
+    structure: match[2],
+    strategy: match[3],
     content: text.replace(match[0], '').trim()
   };
 }
 
-function TrendBadge({ structure, strategy }: { structure: string | null, strategy: string | null }) {
+function TrendBadge({ tier, structure, strategy }: { tier: string | null, structure: string | null, strategy: string | null }) {
   if (!structure) return null;
   
   let label = 'NONE';
@@ -46,8 +56,30 @@ function TrendBadge({ structure, strategy }: { structure: string | null, strateg
     Icon = TrendingDown;
   }
 
+  // Tier Colors
+  let tierColor = '#9ca3af';
+  let tierBg = 'rgba(156,163,175,0.1)';
+  if (tier === 'S-Tier') {
+    tierColor = '#fbbf24'; // amber-400
+    tierBg = 'rgba(251,191,36,0.1)';
+  } else if (tier === 'A-Tier') {
+    tierColor = '#c084fc'; // purple-400
+    tierBg = 'rgba(192,132,252,0.1)';
+  } else if (tier === 'B-Tier') {
+    tierColor = '#38bdf8'; // sky-400
+    tierBg = 'rgba(56,189,248,0.1)';
+  } else if (tier === 'C-Tier') {
+    tierColor = '#f87171'; // red-400
+    tierBg = 'rgba(248,113,113,0.1)';
+  }
+
   return (
     <div style={{ display: 'flex', gap: '8px', alignItems: 'center', marginBottom: '12px' }}>
+      {tier && (
+        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', background: tierBg, color: tierColor, padding: '4px 10px', borderRadius: '6px', fontSize: '12px', fontWeight: 800 }}>
+          <span>{tier}</span>
+        </div>
+      )}
       <div style={{ display: 'flex', alignItems: 'center', gap: '6px', background: bg, color, padding: '4px 10px', borderRadius: '6px', fontSize: '12px', fontWeight: 700 }}>
         <Icon size={14} />
         <span>TREND: {label}</span>
