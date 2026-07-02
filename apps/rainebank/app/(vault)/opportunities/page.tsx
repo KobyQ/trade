@@ -119,7 +119,7 @@ export default function Page() {
       if (!showWarnings) {
         query = query.eq('status', 'PENDING_APPROVAL');
       } else {
-        query = query.eq('status', 'REJECTED').eq('ai_risks', 'Rejected by AI Risk Officer');
+        query = query.or('status.eq.PENDING_APPROVAL,and(status.eq.REJECTED,ai_risks.eq.Rejected by AI Risk Officer)');
       }
 
       const { data, count } = await query;
@@ -166,7 +166,7 @@ export default function Page() {
     <div>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
         <h2 style={{ fontSize: '24px', fontWeight: 800, color: '#fff', letterSpacing: '-0.5px', margin: 0 }}>
-          {showWarnings ? 'AI Risk Warnings (C-Tier)' : 'Pending Opportunities'}
+          Pending Opportunities
         </h2>
         
         <button
@@ -183,11 +183,11 @@ export default function Page() {
             transition: 'all 0.2s'
           }}
         >
-          {showWarnings ? 'View S/A/B-Tier Trades' : 'View C-Tier Warnings'}
+          {showWarnings ? 'Hide C-Tier Signals' : 'Show C-Tier Signals'}
         </button>
       </div>
       
-      {opps.length === 0 && <p style={{ color: '#9ca3af' }}>No {showWarnings ? 'AI warnings' : 'pending opportunities'}.</p>}
+      {opps.length === 0 && <p style={{ color: '#9ca3af' }}>No pending opportunities.</p>}
 
       <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
         {opps.map((signal) => {
@@ -195,11 +195,12 @@ export default function Page() {
           const stopPrice = signal.stop_plan_json?.stop || signal.stop_plan_json?.stop_price;
           const tpPrice = signal.take_profit_json?.tp || signal.take_profit_json?.tp_price;
           const isProcessing = processing === signal.id;
+          const isWarning = signal.status === 'REJECTED';
 
           return (
             <div key={signal.id} style={{
               background: '#0a0a0a',
-              border: `1px solid ${showWarnings ? 'rgba(248,113,113,0.3)' : 'rgba(255,255,255,0.05)'}`,
+              border: `1px solid ${isWarning ? 'rgba(248,113,113,0.3)' : 'rgba(255,255,255,0.05)'}`,
               padding: '32px',
               borderRadius: '24px',
               transition: 'transform 0.2s, box-shadow 0.2s',
@@ -266,9 +267,9 @@ export default function Page() {
                 </div>
               </div>
 
-              <div style={{ background: showWarnings ? 'rgba(248,113,113,0.05)' : 'rgba(37,99,235,0.05)', padding: '20px', borderRadius: '16px', border: `1px solid ${showWarnings ? 'rgba(248,113,113,0.2)' : 'rgba(37,99,235,0.1)'}`, marginBottom: '24px' }}>
-                <div style={{ fontSize: '12px', color: showWarnings ? '#f87171' : '#38bdf8', marginBottom: '12px', fontWeight: 700 }}>
-                  {showWarnings ? 'AI RISK OFFICER WARNING' : 'LLM INSTITUTIONAL RATIONALE'}
+              <div style={{ background: isWarning ? 'rgba(248,113,113,0.05)' : 'rgba(37,99,235,0.05)', padding: '20px', borderRadius: '16px', border: `1px solid ${isWarning ? 'rgba(248,113,113,0.2)' : 'rgba(37,99,235,0.1)'}`, marginBottom: '24px' }}>
+                <div style={{ fontSize: '12px', color: isWarning ? '#f87171' : '#38bdf8', marginBottom: '12px', fontWeight: 700 }}>
+                  {isWarning ? 'AI RISK OFFICER WARNING' : 'LLM INSTITUTIONAL RATIONALE'}
                 </div>
                 {signal.ai_summary ? (
                   <>
@@ -302,7 +303,7 @@ export default function Page() {
                 >
                   Archive
                 </button>
-                {!showWarnings && (
+                {!isWarning && (
                   <button 
                     onClick={() => reject(signal.id)}
                     style={{
@@ -325,19 +326,19 @@ export default function Page() {
                   onClick={() => approve(signal.id)}
                   style={{
                     padding: '10px 24px',
-                    background: showWarnings ? '#f87171' : '#38bdf8',
+                    background: isWarning ? '#f87171' : '#38bdf8',
                     border: 'none',
                     color: '#000',
                     borderRadius: '8px',
                     fontWeight: 700,
                     cursor: 'pointer',
-                    boxShadow: showWarnings ? '0 4px 14px 0 rgba(248,113,113,0.39)' : '0 4px 14px 0 rgba(56,189,248,0.39)',
+                    boxShadow: isWarning ? '0 4px 14px 0 rgba(248,113,113,0.39)' : '0 4px 14px 0 rgba(56,189,248,0.39)',
                     transition: 'all 0.2s',
                   }}
-                  onMouseOver={(e) => { e.currentTarget.style.transform = 'translateY(-1px)'; e.currentTarget.style.boxShadow = showWarnings ? '0 6px 20px rgba(248,113,113,0.5)' : '0 6px 20px rgba(56,189,248,0.5)'; }}
-                  onMouseOut={(e) => { e.currentTarget.style.transform = 'translateY(0)'; e.currentTarget.style.boxShadow = showWarnings ? '0 4px 14px 0 rgba(248,113,113,0.39)' : '0 4px 14px 0 rgba(56,189,248,0.39)'; }}
+                  onMouseOver={(e) => { e.currentTarget.style.transform = 'translateY(-1px)'; e.currentTarget.style.boxShadow = isWarning ? '0 6px 20px rgba(248,113,113,0.5)' : '0 6px 20px rgba(56,189,248,0.5)'; }}
+                  onMouseOut={(e) => { e.currentTarget.style.transform = 'translateY(0)'; e.currentTarget.style.boxShadow = isWarning ? '0 4px 14px 0 rgba(248,113,113,0.39)' : '0 4px 14px 0 rgba(56,189,248,0.39)'; }}
                 >
-                  {showWarnings ? 'Override & Approve' : 'Approve Execution'}
+                  {isWarning ? 'Override & Approve' : 'Approve Execution'}
                 </button>
               </div>
             </div>
